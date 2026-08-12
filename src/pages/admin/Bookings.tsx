@@ -1,0 +1,854 @@
+import { useState } from 'react'
+import DashboardLayout from '@/components/layouts/DashboardLayout'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import { StatusBadge } from '@/components/StatusBadge'
+import { Textarea } from '@/components/ui/textarea'
+import { Search, Loader2, Edit, Truck, Mail, AlertCircle, DollarSign, MessageSquare, Users, CheckCircle2, XCircle } from 'lucide-react'
+import { 
+  useAdminBookings, 
+  useUpdateBookingAdmin, 
+  useAssignDriver, 
+  useAdminDrivers, 
+  useHandleDispute, 
+  useSendEmailReminder,
+  useOfferJobToDrivers,
+  useAddBookingNote,
+  useRecordAdditionalWorkPayment,
+} from '@/hooks/useAdmin'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+
+const BookingsPage = () => {
+  const [page, setPage] = useState(1)
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [editingBooking, setEditingBooking] = useState<any>(null)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false)
+  const [isOfferDialogOpen, setIsOfferDialogOpen] = useState(false)
+  const [isNotesDialogOpen, setIsNotesDialogOpen] = useState(false)
+  const [isAdditionalWorkDialogOpen, setIsAdditionalWorkDialogOpen] = useState(false)
+  const [bookingToAssign, setBookingToAssign] = useState<string | null>(null)
+  const [bookingForOffer, setBookingForOffer] = useState<any>(null)
+  const [selectedDrivers, setSelectedDrivers] = useState<string[]>([])
+  const [offerPercentage, setOfferPercentage] = useState<number>(50)
+  const [noteText, setNoteText] = useState('')
+  const [noteType, setNoteType] = useState<'call' | 'issue' | 'general'>('general')
+  const [additionalWorkAmount, setAdditionalWorkAmount] = useState<number>(0)
+  const [additionalWorkDescription, setAdditionalWorkDescription] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
+  const [errorMessage, setErrorMessage] = useState('')
+
+  const { data, isLoading, refetch } = useAdminBookings({
+    page,
+    limit: 10,
+    search: search || undefined,
+    status: statusFilter === 'all' ? undefined : statusFilter,
+  })
+
+  const { data: driversData } = useAdminDrivers({ limit: 100 })
+  const updateBookingMutation = useUpdateBookingAdmin()
+  const assignDriverMutation = useAssignDriver()
+  const handleDisputeMutation = useHandleDispute()
+  const sendReminderMutation = useSendEmailReminder()
+  const offerJobMutation = useOfferJobToDrivers()
+  const addNoteMutation = useAddBookingNote()
+  const recordPaymentMutation = useRecordAdditionalWorkPayment()
+  const [isDisputeDialogOpen, setIsDisputeDialogOpen] = useState(false)
+  const [bookingToDispute, setBookingToDispute] = useState<any>(null)
+
+  const handleEdit = (booking: any) => {
+    setEditingBooking({ ...booking })
+    setIsEditDialogOpen(true)
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingBooking) return
+    try {
+      await updateBookingMutation.mutateAsync({
+        id: editingBooking._id,
+        data: {
+          status: editingBooking.status,
+          finalPrice: editingBooking.finalPrice,
+          pickupAddress: editingBooking.pickupAddress,
+          pickupCity: editingBooking.pickupCity,
+          pickupZipCode: editingBooking.pickupZipCode,
+          pickupDate: editingBooking.pickupDate,
+          pickupTime: editingBooking.pickupTime,
+          deliveryAddress: editingBooking.deliveryAddress,
+          deliveryCity: editingBooking.deliveryCity,
+          deliveryZipCode: editingBooking.deliveryZipCode,
+          contactEmail: editingBooking.contactEmail,
+          contactPhone: editingBooking.contactPhone,
+        },
+      })
+      setIsEditDialogOpen(false)
+      setEditingBooking(null)
+      setSuccessMessage('Booking updated successfully')
+      setTimeout(() => setSuccessMessage(''), 3000)
+    } catch (error: any) {
+      setErrorMessage(error.response?.data?.message || 'Failed to update booking')
+      setTimeout(() => setErrorMessage(''), 3000)
+    }
+  }
+
+  const handleAssignDriver = async (driverId: string) => {
+    if (!bookingToAssign) return
+    try {
+      await assignDriverMutation.mutateAsync({
+        bookingId: bookingToAssign,
+        driverId,
+      })
+      setIsAssignDialogOpen(false)
+      setBookingToAssign(null)
+      setSuccessMessage('Driver assigned successfully')
+      setTimeout(() => setSuccessMessage(''), 3000)
+    } catch (error: any) {
+      setErrorMessage(error.response?.data?.message || 'Failed to assign driver')
+      setTimeout(() => setErrorMessage(''), 3000)
+    }
+  }
+
+  const handleOfferJob = async () => {
+    if (!bookingForOffer || selectedDrivers.length === 0) return
+    try {
+      await offerJobMutation.mutateAsync({
+        id: bookingForOffer._id,
+        driverIds: selectedDrivers,
+        percentage: offerPercentage,
+      })
+      setIsOfferDialogOpen(false)
+      setBookingForOffer(null)
+      setSelectedDrivers([])
+      setOfferPercentage(50)
+      setSuccessMessage('Job offers sent to drivers successfully')
+      setTimeout(() => setSuccessMessage(''), 3000)
+      refetch()
+    } catch (error: any) {
+      setErrorMessage(error.response?.data?.message || 'Failed to send job offers')
+      setTimeout(() => setErrorMessage(''), 3000)
+    }
+  }
+
+  const handleAddNote = async () => {
+    if (!bookingForOffer || !noteText.trim()) return
+    try {
+      await addNoteMutation.mutateAsync({
+        id: bookingForOffer._id,
+        text: noteText,
+        type: noteType,
+      })
+      setNoteText('')
+      setNoteType('general')
+      setIsNotesDialogOpen(false)
+      setBookingForOffer(null)
+      setSuccessMessage('Note added successfully')
+      setTimeout(() => setSuccessMessage(''), 3000)
+      refetch()
+    } catch (error: any) {
+      setErrorMessage(error.response?.data?.message || 'Failed to add note')
+      setTimeout(() => setErrorMessage(''), 3000)
+    }
+  }
+
+  const handleRecordAdditionalWork = async () => {
+    if (!bookingForOffer || additionalWorkAmount <= 0) return
+    try {
+      await recordPaymentMutation.mutateAsync({
+        id: bookingForOffer._id,
+        amount: additionalWorkAmount,
+        description: additionalWorkDescription,
+      })
+      setIsAdditionalWorkDialogOpen(false)
+      setBookingForOffer(null)
+      setAdditionalWorkAmount(0)
+      setAdditionalWorkDescription('')
+      setSuccessMessage('Additional work payment recorded successfully')
+      setTimeout(() => setSuccessMessage(''), 3000)
+      refetch()
+    } catch (error: any) {
+      setErrorMessage(error.response?.data?.message || 'Failed to record payment')
+      setTimeout(() => setErrorMessage(''), 3000)
+    }
+  }
+
+  const canOfferJob = (booking: any) =>
+    ['pending', 'offered'].includes(booking.status) && !booking.driver
+
+  const canAssignDriver = (booking: any) =>
+    !['completed', 'cancelled'].includes(booking.status)
+
+  return (
+    <DashboardLayout role="admin">
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Booking Management</h2>
+          <p className="text-muted-foreground">Manage all bookings and assign drivers</p>
+        </div>
+
+        {successMessage && (
+          <Alert>
+            <CheckCircle2 className="h-4 w-4" />
+            <AlertTitle>Success</AlertTitle>
+            <AlertDescription>{successMessage}</AlertDescription>
+          </Alert>
+        )}
+
+        {errorMessage && (
+          <Alert variant="destructive">
+            <XCircle className="h-4 w-4" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{errorMessage}</AlertDescription>
+          </Alert>
+        )}
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Bookings</CardTitle>
+            <CardDescription>Search and filter bookings</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-4 mb-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by address, order code, customer name..."
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value)
+                    setPage(1)
+                  }}
+                  className="pl-10"
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={(value) => {
+                setStatusFilter(value)
+                setPage(1)
+              }}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="All Statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="offered">Offered</SelectItem>
+                  <SelectItem value="confirmed">Confirmed</SelectItem>
+                  <SelectItem value="in-progress">In Progress</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                  <SelectItem value="disputed">Disputed</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <>
+                <div className="space-y-4">
+                  {data?.bookings?.map((booking: any) => {
+                    const customer = typeof booking.customer === 'object' ? booking.customer : null
+                    const driver = typeof booking.driver === 'object' ? booking.driver : null
+                    const basePrice = booking.finalPrice || booking.estimatedPrice
+                    const totalPrice = basePrice + (booking.additionalWorkPayment || 0)
+
+                    return (
+                      <Card key={booking._id} className="hover:shadow-md transition-shadow">
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 space-y-3">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h3 className="font-semibold text-lg">
+                                  {customer?.name || 'Unknown Customer'}
+                                </h3>
+                                <StatusBadge status={booking.status} />
+                                {booking.orderCode && (
+                                  <Badge variant="outline">#{booking.orderCode}</Badge>
+                                )}
+                                {booking.isDisputed && (
+                                  <Badge variant="destructive">Disputed</Badge>
+                                )}
+                                {booking.additionalWorkPayment && (
+                                  <Badge variant="secondary">+£{booking.additionalWorkPayment} additional</Badge>
+                                )}
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                <div className="space-y-1">
+                                  <p><strong className="text-muted-foreground">Pickup:</strong> {booking.pickupAddress}, {booking.pickupCity} {booking.pickupZipCode}</p>
+                                  <p><strong className="text-muted-foreground">Delivery:</strong> {booking.deliveryAddress}, {booking.deliveryCity} {booking.deliveryZipCode}</p>
+                                  <p><strong className="text-muted-foreground">Date & Time:</strong> {new Date(booking.pickupDate).toLocaleDateString()} at {booking.pickupTime}</p>
+                                </div>
+                                <div className="space-y-1">
+                                  <p><strong className="text-muted-foreground">Contact:</strong> {booking.contactEmail} | {booking.contactPhone}</p>
+                                  <p><strong className="text-muted-foreground">Price:</strong> £{totalPrice.toFixed(2)} {booking.additionalWorkPayment && `(Base: £${basePrice.toFixed(2)})`}</p>
+                                  {driver && (
+                                    <p><strong className="text-muted-foreground">Driver:</strong> {driver.name}</p>
+                                  )}
+                                  {booking.driverOffers && booking.driverOffers.length > 0 && (
+                                    <div className="mt-2">
+                                      <p className="text-xs font-medium text-muted-foreground mb-1">Job Offers:</p>
+                                      <div className="flex flex-wrap gap-1">
+                                        {booking.driverOffers.map((offer: any, idx: number) => (
+                                          <div key={idx} className="flex items-center gap-1">
+                                            <StatusBadge status={offer.status} kind="offer" />
+                                            <span className="text-xs">£{offer.offeredPrice.toFixed(2)}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {booking.notes && booking.notes.length > 0 && (
+                                <div className="mt-2 pt-2 border-t">
+                                  <p className="text-xs font-medium text-muted-foreground mb-1">Notes ({booking.notes.length}):</p>
+                                  <div className="space-y-1">
+                                    {booking.notes.slice(-3).map((note: any, idx: number) => (
+                                      <p key={idx} className="text-xs text-muted-foreground">
+                                        <span className="font-medium">{note.type}:</span> {note.text.substring(0, 100)}{note.text.length > 100 ? '...' : ''}
+                                      </p>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex flex-col gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setBookingToAssign(booking._id)
+                                  setIsAssignDialogOpen(true)
+                                }}
+                                disabled={!canAssignDriver(booking)}
+                              >
+                                <Truck className="h-4 w-4 mr-1" />
+                                {driver ? 'Change Driver' : 'Assign Driver'}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setBookingForOffer(booking)
+                                  setIsOfferDialogOpen(true)
+                                }}
+                                disabled={!canOfferJob(booking)}
+                              >
+                                <Users className="h-4 w-4 mr-1" />
+                                Offer Job
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setBookingForOffer(booking)
+                                  setIsNotesDialogOpen(true)
+                                }}
+                              >
+                                <MessageSquare className="h-4 w-4 mr-1" />
+                                Add Note
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setBookingForOffer(booking)
+                                  setIsAdditionalWorkDialogOpen(true)
+                                }}
+                              >
+                                <DollarSign className="h-4 w-4 mr-1" />
+                                Add Work
+                              </Button>
+                              {booking.isDisputed && !booking.disputeResolved && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setBookingToDispute(booking)
+                                    setIsDisputeDialogOpen(true)
+                                  }}
+                                >
+                                  <AlertCircle className="h-4 w-4 mr-1" />
+                                  Dispute
+                                </Button>
+                              )}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  sendReminderMutation.mutate({ id: booking._id, type: 'customer' })
+                                }}
+                                disabled={sendReminderMutation.isLoading}
+                                title="Send email reminder to customer"
+                              >
+                                <Mail className="h-4 w-4 mr-1" />
+                                👤
+                              </Button>
+                              {driver && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    sendReminderMutation.mutate({ id: booking._id, type: 'driver' })
+                                  }}
+                                  disabled={sendReminderMutation.isLoading}
+                                  title="Send email reminder to driver"
+                                >
+                                  <Mail className="h-4 w-4 mr-1" />
+                                  🚗
+                                </Button>
+                              )}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleEdit(booking)}
+                              >
+                                <Edit className="h-4 w-4 mr-1" />
+                                Edit
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
+                </div>
+
+                {data?.pagination && data.pagination.pages > 1 && (
+                  <div className="flex items-center justify-between mt-4">
+                    <p className="text-sm text-muted-foreground">
+                      Page {data.pagination.page} of {data.pagination.pages}
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        disabled={page === 1}
+                      >
+                        Previous
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPage((p) => Math.min(data.pagination.pages, p + 1))}
+                        disabled={page === data.pagination.pages}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Edit Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Edit Booking</DialogTitle>
+              <DialogDescription>Update booking details</DialogDescription>
+            </DialogHeader>
+            {editingBooking && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Status</Label>
+                    <Select
+                      value={editingBooking.status}
+                      onValueChange={(value) => setEditingBooking({ ...editingBooking, status: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="offered">Offered</SelectItem>
+                        <SelectItem value="confirmed">Confirmed</SelectItem>
+                        <SelectItem value="in-progress">In Progress</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Final Price (£)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={editingBooking.finalPrice || editingBooking.estimatedPrice}
+                      onChange={(e) => setEditingBooking({ ...editingBooking, finalPrice: parseFloat(e.target.value) })}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label>Contact Name</Label>
+                  <Input
+                    value={typeof editingBooking.customer === 'object' ? editingBooking.customer.name : ''}
+                    disabled
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Contact Email</Label>
+                    <Input
+                      value={editingBooking.contactEmail || ''}
+                      onChange={(e) => setEditingBooking({ ...editingBooking, contactEmail: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label>Contact Phone</Label>
+                    <Input
+                      value={editingBooking.contactPhone || ''}
+                      onChange={(e) => setEditingBooking({ ...editingBooking, contactPhone: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label>Pickup Address</Label>
+                  <Input
+                    value={editingBooking.pickupAddress || ''}
+                    onChange={(e) => setEditingBooking({ ...editingBooking, pickupAddress: e.target.value })}
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label>Pickup City</Label>
+                    <Input
+                      value={editingBooking.pickupCity || ''}
+                      onChange={(e) => setEditingBooking({ ...editingBooking, pickupCity: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label>Pickup Zip Code</Label>
+                    <Input
+                      value={editingBooking.pickupZipCode || ''}
+                      onChange={(e) => setEditingBooking({ ...editingBooking, pickupZipCode: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label>Delivery Address</Label>
+                  <Input
+                    value={editingBooking.deliveryAddress || ''}
+                    onChange={(e) => setEditingBooking({ ...editingBooking, deliveryAddress: e.target.value })}
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label>Delivery City</Label>
+                    <Input
+                      value={editingBooking.deliveryCity || ''}
+                      onChange={(e) => setEditingBooking({ ...editingBooking, deliveryCity: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label>Delivery Zip Code</Label>
+                    <Input
+                      value={editingBooking.deliveryZipCode || ''}
+                      onChange={(e) => setEditingBooking({ ...editingBooking, deliveryZipCode: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Pickup Date</Label>
+                    <Input
+                      type="date"
+                      value={editingBooking.pickupDate ? new Date(editingBooking.pickupDate).toISOString().split('T')[0] : ''}
+                      onChange={(e) => setEditingBooking({ ...editingBooking, pickupDate: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <Label>Pickup Time</Label>
+                    <Input
+                      type="time"
+                      value={editingBooking.pickupTime || ''}
+                      onChange={(e) => setEditingBooking({ ...editingBooking, pickupTime: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSaveEdit} disabled={updateBookingMutation.isLoading}>
+                {updateBookingMutation.isLoading ? 'Saving...' : 'Save'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Assign Driver Dialog */}
+        <Dialog open={isAssignDialogOpen} onOpenChange={setIsAssignDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Assign Driver</DialogTitle>
+              <DialogDescription>Select a driver for this booking</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Driver</Label>
+                <Select onValueChange={handleAssignDriver}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a driver" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {driversData?.drivers?.map((driver: any) => (
+                      <SelectItem key={driver._id} value={driver._id}>
+                        {driver.name} ({driver.email})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsAssignDialogOpen(false)}>
+                Cancel
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Offer Job to Drivers Dialog */}
+        <Dialog open={isOfferDialogOpen} onOpenChange={setIsOfferDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Offer Job to Drivers</DialogTitle>
+              <DialogDescription>
+                {bookingForOffer && (
+                  <span>Base Price: £{bookingForOffer.finalPrice || bookingForOffer.estimatedPrice}</span>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Percentage (%)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={offerPercentage}
+                  onChange={(e) => setOfferPercentage(parseInt(e.target.value))}
+                />
+                {bookingForOffer && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Each driver will receive: £{((bookingForOffer.finalPrice || bookingForOffer.estimatedPrice) * offerPercentage / 100).toFixed(2)}
+                  </p>
+                )}
+              </div>
+              <div>
+                <Label>Select Drivers</Label>
+                <div className="space-y-2 mt-2 max-h-60 overflow-y-auto border rounded p-2">
+                  {driversData?.drivers?.map((driver: any) => (
+                    <div key={driver._id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={driver._id}
+                        checked={selectedDrivers.includes(driver._id)}
+                        onCheckedChange={(checked: boolean) => {
+                          if (checked) {
+                            setSelectedDrivers([...selectedDrivers, driver._id])
+                          } else {
+                            setSelectedDrivers(selectedDrivers.filter(id => id !== driver._id))
+                          }
+                        }}
+                      />
+                      <Label htmlFor={driver._id} className="cursor-pointer">
+                        {driver.name} ({driver.email})
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => {
+                setIsOfferDialogOpen(false)
+                setSelectedDrivers([])
+                setOfferPercentage(50)
+              }}>
+                Cancel
+              </Button>
+              <Button onClick={handleOfferJob} disabled={selectedDrivers.length === 0 || offerJobMutation.isLoading}>
+                {offerJobMutation.isLoading ? 'Sending...' : 'Send Offers'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Note Dialog */}
+        <Dialog open={isNotesDialogOpen} onOpenChange={setIsNotesDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add Note</DialogTitle>
+              <DialogDescription>Add a note to this booking</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Note Type</Label>
+                <Select value={noteType} onValueChange={(value: any) => setNoteType(value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="general">General</SelectItem>
+                    <SelectItem value="call">Call</SelectItem>
+                    <SelectItem value="issue">Issue</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Note</Label>
+                <Textarea
+                  value={noteText}
+                  onChange={(e) => setNoteText(e.target.value)}
+                  placeholder="Enter note details..."
+                  rows={4}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => {
+                setIsNotesDialogOpen(false)
+                setNoteText('')
+                setNoteType('general')
+              }}>
+                Cancel
+              </Button>
+              <Button onClick={handleAddNote} disabled={!noteText.trim() || addNoteMutation.isLoading}>
+                {addNoteMutation.isLoading ? 'Adding...' : 'Add Note'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Additional Work Payment Dialog */}
+        <Dialog open={isAdditionalWorkDialogOpen} onOpenChange={setIsAdditionalWorkDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Record Additional Work Payment</DialogTitle>
+              <DialogDescription>Record payment for additional work performed</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Amount (£)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={additionalWorkAmount}
+                  onChange={(e) => setAdditionalWorkAmount(parseFloat(e.target.value))}
+                />
+              </div>
+              <div>
+                <Label>Description</Label>
+                <Textarea
+                  value={additionalWorkDescription}
+                  onChange={(e) => setAdditionalWorkDescription(e.target.value)}
+                  placeholder="Describe the additional work..."
+                  rows={3}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => {
+                setIsAdditionalWorkDialogOpen(false)
+                setAdditionalWorkAmount(0)
+                setAdditionalWorkDescription('')
+              }}>
+                Cancel
+              </Button>
+              <Button onClick={handleRecordAdditionalWork} disabled={additionalWorkAmount <= 0 || recordPaymentMutation.isLoading}>
+                {recordPaymentMutation.isLoading ? 'Recording...' : 'Record Payment'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Handle Dispute Dialog */}
+        <Dialog open={isDisputeDialogOpen} onOpenChange={setIsDisputeDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Handle Dispute</DialogTitle>
+              <DialogDescription>
+                {bookingToDispute && (
+                  <div className="mt-2">
+                    <p className="text-sm font-medium">Dispute Reason:</p>
+                    <p className="text-sm text-muted-foreground">{bookingToDispute.disputeReason}</p>
+                  </div>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Resolution Status</Label>
+                <Select
+                  onValueChange={(value) => {
+                    if (bookingToDispute) {
+                      handleDisputeMutation.mutate({
+                        id: bookingToDispute._id,
+                        data: {
+                          resolved: value === 'resolved',
+                          status: value === 'resolved' ? 'completed' : undefined,
+                        },
+                      })
+                      setIsDisputeDialogOpen(false)
+                      setBookingToDispute(null)
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select resolution" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="resolved">Mark as Resolved</SelectItem>
+                    <SelectItem value="pending">Keep as Pending</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => {
+                setIsDisputeDialogOpen(false)
+                setBookingToDispute(null)
+              }}>
+                Cancel
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </DashboardLayout>
+  )
+}
+
+export default BookingsPage
