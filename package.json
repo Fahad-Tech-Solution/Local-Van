@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "homepage": "https://fahad-tech-solution.github.io/Local-Van",
+  "homepage": "https://fahad-tech-solution.github.io/Local-Van/",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",

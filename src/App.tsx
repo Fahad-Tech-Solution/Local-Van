@@ -33,7 +33,7 @@ function App() {
   // Vercel handles routing automatically, no basename needed
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <BrowserRouter basename="/Local-Van/">
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
