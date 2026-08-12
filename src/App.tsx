@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, HashRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from 'react-query'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import Home from './pages/Home'
@@ -33,7 +33,9 @@ function App() {
   // Vercel handles routing automatically, no basename needed
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter basename="/Local-Van/">
+      {/* i have replaced this to keep sub routes accessible in github Pages 
+      s <BrowserRouter basename="/Local-Van/"></BrowserRouter> */}
+      <HashRouter>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
@@ -170,7 +172,7 @@ function App() {
             </ProtectedRoute>
           } />
         </Routes>
-      </BrowserRouter>
+      </HashRouter>
     </QueryClientProvider>
   )
 }
