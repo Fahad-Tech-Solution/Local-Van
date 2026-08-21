@@ -51,5 +51,24 @@ export const authApi = {
     const response = await apiClient.post('/auth/change-password', data)
     return response.data
   },
+
+  verifyFirstAccess: async (
+    email: string,
+    token: string
+  ): Promise<{ valid: boolean; email: string; name: string }> => {
+    const response = await apiClient.get('/auth/first-access', {
+      params: { email, token },
+    })
+    return response.data
+  },
+
+  completeFirstAccess: async (data: {
+    email: string
+    token: string
+    password: string
+  }): Promise<AuthResponse & { message: string }> => {
+    const response = await apiClient.post('/auth/first-access', data)
+    return response.data
+  },
 }
 

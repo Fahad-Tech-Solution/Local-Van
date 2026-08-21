@@ -29,9 +29,9 @@ apiClient.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token')
-      // Only redirect if not already on login page to prevent infinite loops
-      if (window.location.pathname !== '/login' && window.location.pathname !== '/') {
-        window.location.href = '/login'
+      const hashPath = window.location.hash.replace(/^#/, '') || '/'
+      if (!hashPath.startsWith('/login') && hashPath !== '/' && !hashPath.startsWith('/first-access')) {
+        window.location.hash = '#/login'
       }
     }
     return Promise.reject(error)

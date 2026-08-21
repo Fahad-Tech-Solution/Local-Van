@@ -1,9 +1,10 @@
-import { Routes, Route, HashRouter } from 'react-router-dom'
+import { HashRouter, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from 'react-query'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import Home from './pages/Home'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import FirstAccess from './pages/FirstAccess'
 import AdminDashboard from './features/admin/AdminDashboard'
 import CustomerDashboard from './features/customer/CustomerDashboard'
 import DriverDashboard from './features/driver/DriverDashboard'
@@ -30,16 +31,15 @@ import NotificationsPage from './pages/Notifications'
 const queryClient = new QueryClient()
 
 function App() {
-  // Vercel handles routing automatically, no basename needed
+  // HashRouter matches GitHub Pages deploy (.../Local-Van/#/...)
   return (
     <QueryClientProvider client={queryClient}>
-      {/* i have replaced this to keep sub routes accessible in github Pages 
-      s <BrowserRouter basename="/Local-Van/"></BrowserRouter> */}
       <HashRouter>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/first-access" element={<FirstAccess />} />
           
           {/* Admin Routes - Protected */}
           <Route path="/admin" element={
@@ -178,4 +178,3 @@ function App() {
 }
 
 export default App
-

@@ -5,8 +5,7 @@ import path from 'path'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  // base: process.env.VITE_BASE_PATH || '/',
-  base: '/Local-Van/', // <-- Set directly here instead of process.env
+  base: process.env.VITE_BASE_PATH || '/',
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -16,7 +15,7 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'https://srv-alpha.onrender.com',
+        target: 'http://localhost:5000',
         changeOrigin: true,
       },
     },

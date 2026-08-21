@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { Button } from './button'
 import { Input } from './input'
-import { Upload, X, Loader2, AlertCircle, Image as ImageIcon } from 'lucide-react'
+import { Upload, X, File, Loader2, AlertCircle, Image as ImageIcon } from 'lucide-react'
 import { uploadApi } from '@/api/upload'
 import { Alert, AlertDescription } from './alert'
 

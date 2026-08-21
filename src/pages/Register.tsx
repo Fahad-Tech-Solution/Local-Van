@@ -158,7 +158,7 @@ export default function Register() {
               </form>
               <div className="relative hidden bg-muted md:block">
                 <img
-                  src="./driver.jpg"
+                  src="/driver.jpg"
                   alt="Local Van"
                   className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
                 />
