@@ -34,7 +34,7 @@ function App() {
   // HashRouter matches GitHub Pages deploy (.../Local-Van/#/...)
   return (
     <QueryClientProvider client={queryClient}>
-      <HashRouter>
+      <HashRouter basename="/Local-Van/">
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />

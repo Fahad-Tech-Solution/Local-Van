@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
-    base: env.VITE_BASE_PATH || '/',
+    base: env.VITE_BASE_PATH || '/Local-Van/',
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
