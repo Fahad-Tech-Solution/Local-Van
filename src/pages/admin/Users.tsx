@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Search, Loader2, Edit, Trash2, MessageSquare } from 'lucide-react'
+import { formatDate } from '@/utils/format'
 import { useAdminUsers, useUpdateUser, useDeleteUser, useAddUserNote } from '@/hooks/useAdmin'
 import {
   Dialog,
@@ -484,7 +485,7 @@ const UsersPage = () => {
                         <div className="flex items-center justify-between mb-1">
                           <span className="font-medium text-xs">{note.type}</span>
                           <span className="text-xs text-muted-foreground">
-                            {new Date(note.createdAt).toLocaleDateString()}
+                            {formatDate(note.createdAt)}
                           </span>
                         </div>
                         <p className="text-xs">{note.text}</p>

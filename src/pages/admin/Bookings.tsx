@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Textarea } from '@/components/ui/textarea'
-import { Search, Loader2, Edit, Truck, Mail, AlertCircle, DollarSign, MessageSquare, Users, CheckCircle2, XCircle, Plus } from 'lucide-react'
+import { Search, Loader2, Edit, Truck, Mail, AlertCircle, PoundSterling, MessageSquare, Users, CheckCircle2, XCircle, Plus } from 'lucide-react'
+import { formatCurrency, formatDate } from '@/utils/format'
 import { 
   useAdminBookings, 
   useUpdateBookingAdmin,
@@ -413,7 +414,7 @@ const BookingsPage = () => {
                                   <Badge variant="destructive">Disputed</Badge>
                                 )}
                                 {booking.additionalWorkPayment && (
-                                  <Badge variant="secondary">+£{booking.additionalWorkPayment} additional</Badge>
+                                  <Badge variant="secondary">+{formatCurrency(booking.additionalWorkPayment)} additional</Badge>
                                 )}
                               </div>
 
@@ -421,11 +422,11 @@ const BookingsPage = () => {
                                 <div className="space-y-1">
                                   <p><strong className="text-muted-foreground">Pickup:</strong> {booking.pickupAddress}, {booking.pickupCity} {booking.pickupZipCode}</p>
                                   <p><strong className="text-muted-foreground">Delivery:</strong> {booking.deliveryAddress}, {booking.deliveryCity} {booking.deliveryZipCode}</p>
-                                  <p><strong className="text-muted-foreground">Date & Time:</strong> {new Date(booking.pickupDate).toLocaleDateString()} at {booking.pickupTime}</p>
+                                  <p><strong className="text-muted-foreground">Date & Time:</strong> {formatDate(booking.pickupDate)} at {booking.pickupTime}</p>
                                 </div>
                                 <div className="space-y-1">
                                   <p><strong className="text-muted-foreground">Contact:</strong> {booking.contactEmail} | {booking.contactPhone}</p>
-                                  <p><strong className="text-muted-foreground">Price:</strong> £{totalPrice.toFixed(2)} {booking.additionalWorkPayment && `(Base: £${basePrice.toFixed(2)})`}</p>
+                                  <p><strong className="text-muted-foreground">Price:</strong> {formatCurrency(totalPrice)} {booking.additionalWorkPayment && `(Base: ${formatCurrency(basePrice)})`}</p>
                                   {driver && (
                                     <p><strong className="text-muted-foreground">Driver:</strong> {driver.name}</p>
                                   )}
@@ -436,7 +437,7 @@ const BookingsPage = () => {
                                         {booking.driverOffers.map((offer: any, idx: number) => (
                                           <div key={idx} className="flex items-center gap-1">
                                             <StatusBadge status={offer.status} kind="offer" />
-                                            <span className="text-xs">£{offer.offeredPrice.toFixed(2)}</span>
+                                            <span className="text-xs">{formatCurrency(offer.offeredPrice)}</span>
                                           </div>
                                         ))}
                                       </div>
@@ -503,7 +504,7 @@ const BookingsPage = () => {
                                   setIsAdditionalWorkDialogOpen(true)
                                 }}
                               >
-                                <DollarSign className="h-4 w-4 mr-1" />
+                                <PoundSterling className="h-4 w-4 mr-1" />
                                 Add Work
                               </Button>
                               {booking.isDisputed && !booking.disputeResolved && (
@@ -1133,7 +1134,7 @@ const BookingsPage = () => {
               <DialogTitle>Offer Job to Drivers</DialogTitle>
               <DialogDescription>
                 {bookingForOffer && (
-                  <span>Base Price: £{bookingForOffer.finalPrice || bookingForOffer.estimatedPrice}</span>
+                  <span>Base Price: {formatCurrency(bookingForOffer.finalPrice || bookingForOffer.estimatedPrice)}</span>
                 )}
               </DialogDescription>
             </DialogHeader>
@@ -1149,7 +1150,7 @@ const BookingsPage = () => {
                 />
                 {bookingForOffer && (
                   <p className="text-sm text-muted-foreground mt-1">
-                    Each driver will receive: £{((bookingForOffer.finalPrice || bookingForOffer.estimatedPrice) * offerPercentage / 100).toFixed(2)}
+                    Each driver will receive: {formatCurrency(((bookingForOffer.finalPrice || bookingForOffer.estimatedPrice) * offerPercentage) / 100)}
                   </p>
                 )}
               </div>

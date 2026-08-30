@@ -8,6 +8,7 @@ import { Loader2, FileText, CheckCircle } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { driverApi } from '@/api/driver'
 import { authApi } from '@/api/auth'
+import { formatDate } from '@/utils/format'
 
 const PricingRulesPage = () => {
   const queryClient = useQueryClient()
@@ -74,7 +75,7 @@ const PricingRulesPage = () => {
                 <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg flex items-center gap-2">
                   <CheckCircle className="h-5 w-5 text-green-600" />
                   <p className="text-sm text-green-800 dark:text-green-200">
-                    You have accepted the pricing rules on {new Date(user.pricingRulesAcceptedAt || '').toLocaleDateString()}
+                    You have accepted the pricing rules on {formatDate(user.pricingRulesAcceptedAt)}
                   </p>
                 </div>
 

@@ -6,6 +6,7 @@ import { StatusBadge } from '@/components/StatusBadge'
 import { useBookings } from '@/hooks/useBookings'
 import { FileText, Calendar, MapPin, Truck } from 'lucide-react'
 import { Booking } from '@/api/bookings'
+import { formatCurrency, formatDate } from '@/utils/format'
 
 const vehicleLabels = {
   'small-van': 'Small Van',
@@ -79,7 +80,7 @@ const MyBookings = () => {
                         <StatusBadge status={booking.status} />
                       </CardTitle>
                       <CardDescription className="mt-2">
-                        Created on {new Date(booking.createdAt).toLocaleDateString()}
+                        Created on {formatDate(booking.createdAt)}
                       </CardDescription>
                     </div>
                     <Button variant="outline" asChild>
@@ -112,7 +113,7 @@ const MyBookings = () => {
                       <div>
                         <p className="text-sm font-medium">Pickup Date</p>
                         <p className="text-sm text-muted-foreground">
-                          {new Date(booking.pickupDate).toLocaleDateString()} at {booking.pickupTime}
+                          {formatDate(booking.pickupDate)} at {booking.pickupTime}
                         </p>
                       </div>
                     </div>
@@ -130,12 +131,12 @@ const MyBookings = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-sm text-muted-foreground">Estimated Price</p>
-                        <p className="text-lg font-semibold">£{booking.estimatedPrice.toFixed(2)}</p>
+                        <p className="text-lg font-semibold">{formatCurrency(booking.estimatedPrice)}</p>
                       </div>
                       {booking.finalPrice && (
                         <div>
                           <p className="text-sm text-muted-foreground">Final Price</p>
-                          <p className="text-lg font-semibold">£{booking.finalPrice.toFixed(2)}</p>
+                          <p className="text-lg font-semibold">{formatCurrency(booking.finalPrice)}</p>
                         </div>
                       )}
                     </div>

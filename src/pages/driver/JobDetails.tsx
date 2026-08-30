@@ -26,6 +26,7 @@ import {
 } from '@/hooks/useDriver'
 import { useAuth } from '@/hooks/useAuth'
 import { getOfferForDriver } from '@/utils/driverOffers'
+import { formatCurrency, formatDate, formatDateTime } from '@/utils/format'
 import {
   Dialog,
   DialogContent,
@@ -182,7 +183,7 @@ const JobDetailsPage = () => {
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <span>
-                  <strong>Date:</strong> {new Date(job.pickupDate).toLocaleDateString()}
+                  <strong>Date:</strong> {formatDate(job.pickupDate)}
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -196,7 +197,7 @@ const JobDetailsPage = () => {
                   <strong>
                     {canRespondToOffer ? 'Offered Pay:' : 'Price:'}
                   </strong>{' '}
-                  £{offeredPrice}
+                  {formatCurrency(offeredPrice)}
                 </span>
               </div>
               {canRespondToOffer && offer?.offeredPrice != null && (
@@ -208,7 +209,7 @@ const JobDetailsPage = () => {
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Clock className="h-4 w-4" />
                   <span>
-                    Offer expires: {new Date(job.offerExpiresAt).toLocaleString()}
+                    Offer expires: {formatDateTime(job.offerExpiresAt)}
                   </span>
                 </div>
               )}
@@ -401,7 +402,7 @@ const JobDetailsPage = () => {
                   className="flex-1 min-w-[140px]"
                 >
                   <CheckCircle className="mr-2 h-4 w-4" />
-                  Accept Offer (£{offeredPrice})
+                  Accept Offer ({formatCurrency(offeredPrice)})
                 </Button>
                 <Button
                   variant="outline"

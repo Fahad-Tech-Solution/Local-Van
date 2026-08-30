@@ -12,6 +12,7 @@ import {
 import { useNotificationSocket } from '@/hooks/useNotificationSocket'
 import { AdminNotification } from '@/api/admin'
 import { formatRelativeTime, getNotificationLink, getNotificationJobName } from '@/utils/notifications'
+import { formatCurrency } from '@/utils/format'
 
 const NotificationsPage = () => {
   useNotificationSocket()
@@ -95,7 +96,7 @@ const NotificationsPage = () => {
                             <span>Job: {getNotificationJobName(notification)}</span>
                           )}
                           {notification.offeredPrice != null && (
-                            <span>£{Number(notification.offeredPrice).toFixed(2)}</span>
+                            <span>{formatCurrency(notification.offeredPrice)}</span>
                           )}
                         </div>
                       </div>

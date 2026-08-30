@@ -8,6 +8,7 @@ import { driverApi } from '@/api/driver'
 import { Link } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { getOfferForDriver } from '@/utils/driverOffers'
+import { formatCurrency, formatDate, formatDateTime } from '@/utils/format'
 
 const AvailableJobsPage = () => {
   const { user } = useAuth()
@@ -114,7 +115,7 @@ const AvailableJobsPage = () => {
                               <div>
                                 <p className="text-sm font-medium">Pickup Date</p>
                                 <p className="text-sm text-muted-foreground">
-                                  {new Date(booking.pickupDate).toLocaleDateString()} at {booking.pickupTime}
+                                  {formatDate(booking.pickupDate)} at {booking.pickupTime}
                                 </p>
                               </div>
                             </div>
@@ -131,14 +132,14 @@ const AvailableJobsPage = () => {
 
                             <div>
                               <p className="text-sm font-medium">Offered Pay</p>
-                              <p className="text-sm font-semibold">£{offeredPrice}</p>
+                              <p className="text-sm font-semibold">{formatCurrency(offeredPrice)}</p>
                             </div>
 
                             {booking.offerExpiresAt && (
                               <div>
                                 <p className="text-sm font-medium">Offer Expires</p>
                                 <p className="text-sm text-muted-foreground">
-                                  {new Date(booking.offerExpiresAt).toLocaleString()}
+                                  {formatDateTime(booking.offerExpiresAt)}
                                 </p>
                               </div>
                             )}
@@ -158,7 +159,7 @@ const AvailableJobsPage = () => {
                               className="flex-1"
                             >
                               <CheckCircle className="mr-2 h-4 w-4" />
-                              Accept (£{offeredPrice})
+                              Accept ({formatCurrency(offeredPrice)})
                             </Button>
                             <Button
                               variant="outline"

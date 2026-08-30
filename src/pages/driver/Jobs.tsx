@@ -20,6 +20,7 @@ import { useMutation, useQuery, useQueryClient } from 'react-query'
 import { driverApi } from '@/api/driver'
 import { useAuth } from '@/hooks/useAuth'
 import { getOfferForDriver } from '@/utils/driverOffers'
+import { formatCurrency, formatDate } from '@/utils/format'
 import {
   Select,
   SelectContent,
@@ -201,7 +202,7 @@ const DriverJobsPage = () => {
                           <div className="text-sm text-muted-foreground flex items-center gap-2">
                             <Calendar className="h-4 w-4" />
                             <span>
-                              {new Date(booking.pickupDate).toLocaleDateString()} at{' '}
+                              {formatDate(booking.pickupDate)} at{' '}
                               {booking.pickupTime}
                             </span>
                           </div>
@@ -218,7 +219,7 @@ const DriverJobsPage = () => {
                           className="flex-1"
                         >
                           <CheckCircle className="mr-2 h-4 w-4" />
-                          Accept (£{offeredPrice})
+                          Accept ({formatCurrency(offeredPrice)})
                         </Button>
                         <Button
                           variant="outline"
@@ -273,7 +274,7 @@ const DriverJobsPage = () => {
                           <div className="text-sm text-muted-foreground flex items-center gap-2">
                             <Calendar className="h-4 w-4" />
                             <span>
-                              {new Date(booking.pickupDate).toLocaleDateString()} at{' '}
+                              {formatDate(booking.pickupDate)} at{' '}
                               {booking.pickupTime}
                             </span>
                           </div>
@@ -348,12 +349,12 @@ const DriverJobsPage = () => {
                                   </div>
                                   <div className="flex items-center gap-2">
                                     <Calendar className="h-4 w-4" />
-                                    <span>{new Date(booking.pickupDate).toLocaleDateString()}</span>
+                                    <span>{formatDate(booking.pickupDate)}</span>
                                   </div>
                                 </div>
                                 <div className="mt-2 flex items-center gap-2 text-sm">
                                   <span className="font-medium">
-                                    £{booking.finalPrice || booking.estimatedPrice}
+                                    {formatCurrency(booking.finalPrice || booking.estimatedPrice)}
                                   </span>
                                 </div>
                               </div>

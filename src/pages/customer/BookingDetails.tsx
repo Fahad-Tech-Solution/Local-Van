@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useBooking, useCancelBooking, useAmendBooking } from '@/hooks/useBookings'
 import { MapPin, Calendar, Truck, Phone, Mail, FileText, AlertCircle, Edit } from 'lucide-react'
+import { formatCurrency, formatDate } from '@/utils/format'
 import {
   Dialog,
   DialogContent,
@@ -94,7 +95,7 @@ const BookingDetails = () => {
       const result = await amendBooking.mutateAsync({ id, data: payload })
       setAmendSuccess(result?.message || 'Booking amended successfully!')
       if (result?.newPrice !== undefined) {
-        setAmendSuccess(prev => prev + ` New price: £${result.newPrice?.toFixed(2) || '0.00'}`)
+        setAmendSuccess(prev => prev + ` New price: ${formatCurrency(result.newPrice)}`)
       }
       setAmendDialogOpen(false)
       setTimeout(() => setAmendSuccess(''), 5000)
@@ -306,7 +307,7 @@ const BookingDetails = () => {
               </div>
               <div className="text-right">
                 <p className="text-sm text-muted-foreground">Created</p>
-                <p className="font-medium">{new Date(booking.createdAt).toLocaleDateString()}</p>
+                <p className="font-medium">{formatDate(booking.createdAt)}</p>
               </div>
             </div>
           </CardContent>
@@ -329,7 +330,7 @@ const BookingDetails = () => {
               <div className="flex items-center gap-2 mt-4">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm">
-                  {new Date(booking.pickupDate).toLocaleDateString()} at {booking.pickupTime}
+                  {formatDate(booking.pickupDate)} at {booking.pickupTime}
                 </span>
               </div>
             </CardContent>
@@ -387,11 +388,11 @@ const BookingDetails = () => {
               </div>
               <div className="pt-3 border-t">
                 <p className="text-sm text-muted-foreground">Estimated Price</p>
-                <p className="text-2xl font-bold">£{booking.estimatedPrice.toFixed(2)}</p>
+                <p className="text-2xl font-bold">{formatCurrency(booking.estimatedPrice)}</p>
                 {booking.finalPrice && (
                   <>
                     <p className="text-sm text-muted-foreground mt-2">Final Price</p>
-                    <p className="text-xl font-semibold">£{booking.finalPrice.toFixed(2)}</p>
+                    <p className="text-xl font-semibold">{formatCurrency(booking.finalPrice)}</p>
                   </>
                 )}
                 <Badge className="mt-2">{booking.paymentStatus}</Badge>

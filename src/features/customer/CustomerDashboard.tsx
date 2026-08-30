@@ -6,6 +6,7 @@ import { StatusBadge } from '@/components/StatusBadge'
 import { useBookings } from '@/hooks/useBookings'
 import { Truck, FileText, Plus, Calendar, MapPin, ArrowRight } from 'lucide-react'
 import { Booking } from '@/api/bookings'
+import { formatCurrency, formatDate } from '@/utils/format'
 
 const CustomerDashboard = () => {
   const { data, isLoading } = useBookings({ limit: 5 })
@@ -98,9 +99,9 @@ const CustomerDashboard = () => {
                         </span>
                         <span className="flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          {new Date(booking.pickupDate).toLocaleDateString()}
+                          {formatDate(booking.pickupDate)}
                         </span>
-                        <span className="font-medium">£{booking.estimatedPrice.toFixed(2)}</span>
+                        <span className="font-medium">{formatCurrency(booking.estimatedPrice)}</span>
                       </div>
                     </div>
                     <Button variant="ghost" size="icon" asChild>

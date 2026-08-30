@@ -21,6 +21,7 @@ import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { driverApi } from '@/api/driver'
 import { useAuth } from '@/hooks/useAuth'
 import { getOfferForDriver } from '@/utils/driverOffers'
+import { formatCurrency, formatCurrencyWhole, formatDate } from '@/utils/format'
 
 const DriverDashboard = () => {
   const { user } = useAuth()
@@ -132,7 +133,7 @@ const DriverDashboard = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    £{(stats?.totalEarnings || 0).toLocaleString()}
+                    {formatCurrencyWhole(stats?.totalEarnings || 0)}
                   </div>
                   <p className="text-xs text-muted-foreground">From completed jobs</p>
                 </CardContent>
@@ -242,7 +243,7 @@ const DriverDashboard = () => {
                                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                   <Calendar className="h-3 w-3" />
                                   <span>
-                                    {new Date(booking.pickupDate).toLocaleDateString()} at{' '}
+                                    {formatDate(booking.pickupDate)} at{' '}
                                     {booking.pickupTime}
                                   </span>
                                 </div>
@@ -260,7 +261,7 @@ const DriverDashboard = () => {
                                 disabled={acceptMutation.isLoading || rejectMutation.isLoading}
                               >
                                 <CheckCircle className="mr-1 h-3 w-3" />
-                                Accept (£{offeredPrice})
+                                Accept ({formatCurrency(offeredPrice)})
                               </Button>
                               <Button
                                 size="sm"
@@ -306,7 +307,7 @@ const DriverDashboard = () => {
                       <p className="text-xs text-muted-foreground">Completed jobs</p>
                     </div>
                     <p className="text-lg font-bold">
-                      £{(stats?.totalEarnings || 0).toLocaleString()}
+                      {formatCurrencyWhole(stats?.totalEarnings || 0)}
                     </p>
                   </div>
                   {stats?.recentEarnings && stats.recentEarnings.length > 0 ? (
@@ -318,7 +319,7 @@ const DriverDashboard = () => {
                               {earning.orderCode || earning._id.slice(-6)}
                             </div>
                             <div className="text-sm font-semibold text-emerald-700">
-                              £{Number(earning.amount || 0).toLocaleString()}
+                              {formatCurrencyWhole(earning.amount || 0)}
                             </div>
                           </div>
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -330,7 +331,7 @@ const DriverDashboard = () => {
                           {earning.completedAt && (
                             <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
                               <Calendar className="h-3 w-3" />
-                              <span>{new Date(earning.completedAt).toLocaleDateString()}</span>
+                              <span>{formatDate(earning.completedAt)}</span>
                             </div>
                           )}
                         </div>
@@ -376,8 +377,8 @@ const DriverDashboard = () => {
                               <Calendar className="h-3 w-3" />
                               <span>
                                 {booking.completedAt
-                                  ? new Date(booking.completedAt).toLocaleDateString()
-                                  : new Date(booking.pickupDate).toLocaleDateString()}
+                                  ? formatDate(booking.completedAt)
+                                  : formatDate(booking.pickupDate)}
                               </span>
                             </div>
                           </div>

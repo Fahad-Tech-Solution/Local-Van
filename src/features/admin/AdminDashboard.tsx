@@ -6,6 +6,7 @@ import { useAdminStats, useAdminUsers } from '@/hooks/useAdmin'
 import { Link, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { formatCurrencyWhole } from '@/utils/format'
 
 const AdminDashboard = () => {
   const { data: stats, isLoading } = useAdminStats()
@@ -128,15 +129,14 @@ const AdminDashboard = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    £{stats?.revenue.total?.toLocaleString() || '0'}
+                    {formatCurrencyWhole(stats?.revenue.total || 0)}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Paid to date: £{stats?.revenue.totalSpent?.toLocaleString() || '0'}
+                    Paid to date: {formatCurrencyWhole(stats?.revenue.totalSpent || 0)}
                   </p>
                   {(stats?.revenue.pipeline ?? 0) > 0 && (
                     <p className="text-xs text-muted-foreground mt-1">
-                      Pipeline (confirmed/in-progress): £
-                      {stats?.revenue.pipeline?.toLocaleString()}
+                      Pipeline (confirmed/in-progress): {formatCurrencyWhole(stats?.revenue.pipeline)}
                     </p>
                   )}
                 </CardContent>
