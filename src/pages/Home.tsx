@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 
 const Home = () => {
@@ -11,8 +12,12 @@ const Home = () => {
           Your trusted moving service platform
         </p>
         <div className="flex gap-4 justify-center">
-          <Button size="lg">Get Started</Button>
-          <Button variant="outline" size="lg">Learn More</Button>
+          <Button size="lg" asChild>
+            <Link to="/login">Login</Link>
+          </Button>
+          <Button variant="outline" size="lg" asChild>
+            <Link to="/register">Sign up</Link>
+          </Button>
         </div>
       </div>
     </div>

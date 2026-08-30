@@ -198,6 +198,42 @@ export const adminApi = {
     return response.data
   },
 
+  createBooking: async (data: {
+    customer: { name: string; email: string; phone: string }
+    pickupAddress: string
+    pickupCity: string
+    pickupZipCode: string
+    pickupDate: string
+    pickupTime: string
+    deliveryAddress: string
+    deliveryCity: string
+    deliveryZipCode: string
+    serviceType: 'local' | 'long-distance' | 'interstate'
+    vehicleType: 'small-van' | 'medium-van' | 'large-van' | 'truck'
+    price: number
+    paymentStatus: 'paid' | 'pending'
+    paymentMethod?: 'bank-transfer' | 'cash' | 'card' | 'other'
+    paymentReference?: string
+    specialInstructions?: string
+    sendConfirmationEmail?: boolean
+    pickupAccess?: 'lift' | 'stairs' | 'ground'
+    pickupStairsCount?: number
+    deliveryAccess?: 'lift' | 'stairs' | 'ground'
+    deliveryStairsCount?: number
+    men?: number
+  }): Promise<{
+    message: string
+    booking: Booking
+    customerStatus: 'existing' | 'created'
+    emails: {
+      confirmation: 'sent' | 'failed' | 'skipped'
+      onboardingInvite: 'sent' | 'failed' | 'not_required'
+    }
+  }> => {
+    const response = await apiClient.post('/admin/bookings', data)
+    return response.data
+  },
+
   assignDriver: async (id: string, driverId: string): Promise<{ message: string; booking: Booking }> => {
     const response = await apiClient.post(`/admin/bookings/${id}/assign-driver`, { driverId })
     return response.data

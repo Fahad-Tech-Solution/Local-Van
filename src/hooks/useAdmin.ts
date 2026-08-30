@@ -194,6 +194,19 @@ export const useUpdateBookingAdmin = () => {
   )
 }
 
+export const useCreateBookingAdmin = () => {
+  const queryClient = useQueryClient()
+  return useMutation(
+    (data: Parameters<typeof adminApi.createBooking>[0]) => adminApi.createBooking(data),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('adminBookings')
+        queryClient.invalidateQueries('adminStats')
+      },
+    }
+  )
+}
+
 export const useAssignDriver = () => {
   const queryClient = useQueryClient()
   return useMutation(

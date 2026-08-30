@@ -6,10 +6,11 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Textarea } from '@/components/ui/textarea'
-import { Search, Loader2, Edit, Truck, Mail, AlertCircle, DollarSign, MessageSquare, Users, CheckCircle2, XCircle } from 'lucide-react'
+import { Search, Loader2, Edit, Truck, Mail, AlertCircle, DollarSign, MessageSquare, Users, CheckCircle2, XCircle, Plus } from 'lucide-react'
 import { 
   useAdminBookings, 
-  useUpdateBookingAdmin, 
+  useUpdateBookingAdmin,
+  useCreateBookingAdmin,
   useAssignDriver, 
   useAdminDrivers, 
   useHandleDispute, 
@@ -36,6 +37,31 @@ import {
 } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+
+const emptyManualOrder = () => ({
+  customer: { name: '', email: '', phone: '' },
+  pickupAddress: '',
+  pickupCity: '',
+  pickupZipCode: '',
+  pickupDate: '',
+  pickupTime: '10:00',
+  deliveryAddress: '',
+  deliveryCity: '',
+  deliveryZipCode: '',
+  serviceType: 'local' as const,
+  vehicleType: 'small-van' as const,
+  pickupAccess: 'ground' as 'lift' | 'stairs' | 'ground',
+  pickupStairsCount: 1,
+  deliveryAccess: 'ground' as 'lift' | 'stairs' | 'ground',
+  deliveryStairsCount: 1,
+  men: 2,
+  price: 0,
+  paymentStatus: 'paid' as 'paid' | 'pending',
+  paymentMethod: 'bank-transfer' as 'bank-transfer' | 'cash' | 'card' | 'other',
+  paymentReference: '',
+  specialInstructions: '',
+  sendConfirmationEmail: true,
+})
 
 const BookingsPage = () => {
   const [page, setPage] = useState(1)
@@ -67,6 +93,7 @@ const BookingsPage = () => {
 
   const { data: driversData } = useAdminDrivers({ limit: 100 })
   const updateBookingMutation = useUpdateBookingAdmin()
+  const createBookingMutation = useCreateBookingAdmin()
   const assignDriverMutation = useAssignDriver()
   const handleDisputeMutation = useHandleDispute()
   const sendReminderMutation = useSendEmailReminder()
@@ -75,6 +102,8 @@ const BookingsPage = () => {
   const recordPaymentMutation = useRecordAdditionalWorkPayment()
   const [isDisputeDialogOpen, setIsDisputeDialogOpen] = useState(false)
   const [bookingToDispute, setBookingToDispute] = useState<any>(null)
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+  const [newManualOrder, setNewManualOrder] = useState(emptyManualOrder)
 
   const handleEdit = (booking: any) => {
     setEditingBooking({ ...booking })
@@ -107,6 +136,94 @@ const BookingsPage = () => {
       setTimeout(() => setSuccessMessage(''), 3000)
     } catch (error: any) {
       setErrorMessage(error.response?.data?.message || 'Failed to update booking')
+      setTimeout(() => setErrorMessage(''), 3000)
+    }
+  }
+
+  const handleOpenCreateDialog = () => {
+    setNewManualOrder(emptyManualOrder())
+    setIsCreateDialogOpen(true)
+  }
+
+  const isManualOrderValid = () => {
+    const order = newManualOrder
+    const hasCustomer =
+      order.customer.name.trim() &&
+      order.customer.email.trim() &&
+      order.customer.phone.trim()
+    const hasAddresses =
+      order.pickupAddress.trim() &&
+      order.pickupCity.trim() &&
+      order.pickupZipCode.trim() &&
+      order.deliveryAddress.trim() &&
+      order.deliveryCity.trim() &&
+      order.deliveryZipCode.trim() &&
+      order.pickupDate
+    const hasPayment =
+      order.paymentStatus === 'pending' ||
+      (order.paymentStatus === 'paid' && order.paymentMethod)
+    const hasAccess =
+      (order.pickupAccess !== 'stairs' || order.pickupStairsCount >= 1) &&
+      (order.deliveryAccess !== 'stairs' || order.deliveryStairsCount >= 1)
+    return hasCustomer && hasAddresses && order.price > 0 && hasPayment && order.men >= 1 && hasAccess
+  }
+
+  const handleCreateManualOrder = async () => {
+    if (!isManualOrderValid()) return
+    try {
+      const result = await createBookingMutation.mutateAsync({
+        customer: {
+          name: newManualOrder.customer.name.trim(),
+          email: newManualOrder.customer.email.trim(),
+          phone: newManualOrder.customer.phone.trim(),
+        },
+        pickupAddress: newManualOrder.pickupAddress.trim(),
+        pickupCity: newManualOrder.pickupCity.trim(),
+        pickupZipCode: newManualOrder.pickupZipCode.trim(),
+        pickupDate: new Date(newManualOrder.pickupDate).toISOString(),
+        pickupTime: newManualOrder.pickupTime,
+        deliveryAddress: newManualOrder.deliveryAddress.trim(),
+        deliveryCity: newManualOrder.deliveryCity.trim(),
+        deliveryZipCode: newManualOrder.deliveryZipCode.trim(),
+        serviceType: newManualOrder.serviceType,
+        vehicleType: newManualOrder.vehicleType,
+        price: newManualOrder.price,
+        paymentStatus: newManualOrder.paymentStatus,
+        paymentMethod:
+          newManualOrder.paymentStatus === 'paid' ? newManualOrder.paymentMethod : undefined,
+        paymentReference: newManualOrder.paymentReference.trim() || undefined,
+        specialInstructions: newManualOrder.specialInstructions.trim() || undefined,
+        sendConfirmationEmail: newManualOrder.sendConfirmationEmail,
+        pickupAccess: newManualOrder.pickupAccess,
+        pickupStairsCount:
+          newManualOrder.pickupAccess === 'stairs' ? newManualOrder.pickupStairsCount : undefined,
+        deliveryAccess: newManualOrder.deliveryAccess,
+        deliveryStairsCount:
+          newManualOrder.deliveryAccess === 'stairs' ? newManualOrder.deliveryStairsCount : undefined,
+        men: newManualOrder.men,
+      })
+
+      setIsCreateDialogOpen(false)
+      setNewManualOrder(emptyManualOrder())
+
+      const emailParts: string[] = []
+      if (result.emails.confirmation === 'sent') {
+        emailParts.push('confirmation email sent')
+      } else if (result.emails.confirmation === 'failed') {
+        emailParts.push('confirmation email failed')
+      }
+      if (result.emails.onboardingInvite === 'sent') {
+        emailParts.push('account setup invite sent')
+      } else if (result.emails.onboardingInvite === 'failed') {
+        emailParts.push('account setup invite failed')
+      }
+
+      const emailNote = emailParts.length > 0 ? ` (${emailParts.join(', ')})` : ''
+      setSuccessMessage(`Manual order ${result.booking.orderCode || 'created'} added successfully${emailNote}`)
+      setTimeout(() => setSuccessMessage(''), 5000)
+      refetch()
+    } catch (error: any) {
+      setErrorMessage(error.response?.data?.message || 'Failed to create manual order')
       setTimeout(() => setErrorMessage(''), 3000)
     }
   }
@@ -200,9 +317,15 @@ const BookingsPage = () => {
   return (
     <DashboardLayout role="admin">
       <div className="space-y-6">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Booking Management</h2>
-          <p className="text-muted-foreground">Manage all bookings and assign drivers</p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight">Booking Management</h2>
+            <p className="text-muted-foreground">Manage all bookings and assign drivers</p>
+          </div>
+          <Button onClick={handleOpenCreateDialog}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Manual Order
+          </Button>
         </div>
 
         {successMessage && (
@@ -468,6 +591,370 @@ const BookingsPage = () => {
           </CardContent>
         </Card>
 
+        {/* Create Manual Order Dialog */}
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Add Manual Order</DialogTitle>
+              <DialogDescription>
+                Create a booking for customers who booked by phone and paid directly to the business
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Customer Name</Label>
+                  <Input
+                    value={newManualOrder.customer.name}
+                    onChange={(e) =>
+                      setNewManualOrder({
+                        ...newManualOrder,
+                        customer: { ...newManualOrder.customer, name: e.target.value },
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <Label>Customer Phone</Label>
+                  <Input
+                    value={newManualOrder.customer.phone}
+                    onChange={(e) =>
+                      setNewManualOrder({
+                        ...newManualOrder,
+                        customer: { ...newManualOrder.customer, phone: e.target.value },
+                      })
+                    }
+                  />
+                </div>
+              </div>
+              <div>
+                <Label>Customer Email</Label>
+                <Input
+                  type="email"
+                  value={newManualOrder.customer.email}
+                  onChange={(e) =>
+                    setNewManualOrder({
+                      ...newManualOrder,
+                      customer: { ...newManualOrder.customer, email: e.target.value },
+                    })
+                  }
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Price (£)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={newManualOrder.price || ''}
+                    onChange={(e) =>
+                      setNewManualOrder({
+                        ...newManualOrder,
+                        price: parseFloat(e.target.value) || 0,
+                      })
+                    }
+                  />
+                </div>
+                <div>
+                  <Label>Payment Status</Label>
+                  <Select
+                    value={newManualOrder.paymentStatus}
+                    onValueChange={(value: 'paid' | 'pending') =>
+                      setNewManualOrder({ ...newManualOrder, paymentStatus: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="paid">Paid</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {newManualOrder.paymentStatus === 'paid' && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Payment Method</Label>
+                    <Select
+                      value={newManualOrder.paymentMethod}
+                      onValueChange={(value: 'bank-transfer' | 'cash' | 'card' | 'other') =>
+                        setNewManualOrder({ ...newManualOrder, paymentMethod: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="bank-transfer">Bank Transfer</SelectItem>
+                        <SelectItem value="cash">Cash</SelectItem>
+                        <SelectItem value="card">Card</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Payment Reference (optional)</Label>
+                    <Input
+                      placeholder="Bank ref, receipt no..."
+                      value={newManualOrder.paymentReference}
+                      onChange={(e) =>
+                        setNewManualOrder({ ...newManualOrder, paymentReference: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Service Type</Label>
+                  <Select
+                    value={newManualOrder.serviceType}
+                    onValueChange={(value: 'local' | 'long-distance' | 'interstate') =>
+                      setNewManualOrder({ ...newManualOrder, serviceType: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="local">Local</SelectItem>
+                      <SelectItem value="long-distance">Long Distance</SelectItem>
+                      <SelectItem value="interstate">Interstate</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Vehicle Type</Label>
+                  <Select
+                    value={newManualOrder.vehicleType}
+                    onValueChange={(value: 'small-van' | 'medium-van' | 'large-van' | 'truck') =>
+                      setNewManualOrder({ ...newManualOrder, vehicleType: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="small-van">Small Van</SelectItem>
+                      <SelectItem value="medium-van">Medium Van</SelectItem>
+                      <SelectItem value="large-van">Large Van</SelectItem>
+                      <SelectItem value="truck">Truck</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div>
+                <Label>Pickup Address</Label>
+                <Input
+                  value={newManualOrder.pickupAddress}
+                  onChange={(e) =>
+                    setNewManualOrder({ ...newManualOrder, pickupAddress: e.target.value })
+                  }
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <Label>Pickup City</Label>
+                  <Input
+                    value={newManualOrder.pickupCity}
+                    onChange={(e) =>
+                      setNewManualOrder({ ...newManualOrder, pickupCity: e.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <Label>Pickup Postcode</Label>
+                  <Input
+                    value={newManualOrder.pickupZipCode}
+                    onChange={(e) =>
+                      setNewManualOrder({ ...newManualOrder, pickupZipCode: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Pickup Access</Label>
+                  <Select
+                    value={newManualOrder.pickupAccess}
+                    onValueChange={(value: 'lift' | 'stairs' | 'ground') =>
+                      setNewManualOrder({ ...newManualOrder, pickupAccess: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ground">Ground floor</SelectItem>
+                      <SelectItem value="lift">Lift</SelectItem>
+                      <SelectItem value="stairs">Stairs</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {newManualOrder.pickupAccess === 'stairs' && (
+                  <div>
+                    <Label>Pickup Stairs (flights)</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="50"
+                      value={newManualOrder.pickupStairsCount}
+                      onChange={(e) =>
+                        setNewManualOrder({
+                          ...newManualOrder,
+                          pickupStairsCount: parseInt(e.target.value, 10) || 1,
+                        })
+                      }
+                    />
+                  </div>
+                )}
+              </div>
+              <div>
+                <Label>Delivery Address</Label>
+                <Input
+                  value={newManualOrder.deliveryAddress}
+                  onChange={(e) =>
+                    setNewManualOrder({ ...newManualOrder, deliveryAddress: e.target.value })
+                  }
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <Label>Delivery City</Label>
+                  <Input
+                    value={newManualOrder.deliveryCity}
+                    onChange={(e) =>
+                      setNewManualOrder({ ...newManualOrder, deliveryCity: e.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <Label>Delivery Postcode</Label>
+                  <Input
+                    value={newManualOrder.deliveryZipCode}
+                    onChange={(e) =>
+                      setNewManualOrder({ ...newManualOrder, deliveryZipCode: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Delivery Access</Label>
+                  <Select
+                    value={newManualOrder.deliveryAccess}
+                    onValueChange={(value: 'lift' | 'stairs' | 'ground') =>
+                      setNewManualOrder({ ...newManualOrder, deliveryAccess: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ground">Ground floor</SelectItem>
+                      <SelectItem value="lift">Lift</SelectItem>
+                      <SelectItem value="stairs">Stairs</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {newManualOrder.deliveryAccess === 'stairs' && (
+                  <div>
+                    <Label>Delivery Stairs (flights)</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="50"
+                      value={newManualOrder.deliveryStairsCount}
+                      onChange={(e) =>
+                        setNewManualOrder({
+                          ...newManualOrder,
+                          deliveryStairsCount: parseInt(e.target.value, 10) || 1,
+                        })
+                      }
+                    />
+                  </div>
+                )}
+              </div>
+              <div>
+                <Label>People Required</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  max="20"
+                  value={newManualOrder.men}
+                  onChange={(e) =>
+                    setNewManualOrder({
+                      ...newManualOrder,
+                      men: parseInt(e.target.value, 10) || 1,
+                    })
+                  }
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Pickup Date</Label>
+                  <Input
+                    type="date"
+                    value={newManualOrder.pickupDate}
+                    onChange={(e) =>
+                      setNewManualOrder({ ...newManualOrder, pickupDate: e.target.value })
+                    }
+                  />
+                </div>
+                <div>
+                  <Label>Pickup Time</Label>
+                  <Input
+                    type="time"
+                    value={newManualOrder.pickupTime}
+                    onChange={(e) =>
+                      setNewManualOrder({ ...newManualOrder, pickupTime: e.target.value })
+                    }
+                  />
+                </div>
+              </div>
+              <div>
+                <Label>Special Instructions (optional)</Label>
+                <Textarea
+                  value={newManualOrder.specialInstructions}
+                  onChange={(e) =>
+                    setNewManualOrder({ ...newManualOrder, specialInstructions: e.target.value })
+                  }
+                  rows={3}
+                />
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="sendConfirmationEmail"
+                  checked={newManualOrder.sendConfirmationEmail}
+                  onCheckedChange={(checked) =>
+                    setNewManualOrder({
+                      ...newManualOrder,
+                      sendConfirmationEmail: checked === true,
+                    })
+                  }
+                />
+                <Label htmlFor="sendConfirmationEmail" className="font-normal cursor-pointer">
+                  Send order confirmation email to customer
+                </Label>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCreateManualOrder}
+                disabled={createBookingMutation.isLoading || !isManualOrderValid()}
+              >
+                {createBookingMutation.isLoading ? 'Creating...' : 'Create Order'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         {/* Edit Dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -546,7 +1033,7 @@ const BookingsPage = () => {
                     />
                   </div>
                   <div>
-                    <Label>Pickup Zip Code</Label>
+                    <Label>Pickup Postcode</Label>
                     <Input
                       value={editingBooking.pickupZipCode || ''}
                       onChange={(e) => setEditingBooking({ ...editingBooking, pickupZipCode: e.target.value })}
@@ -569,7 +1056,7 @@ const BookingsPage = () => {
                     />
                   </div>
                   <div>
-                    <Label>Delivery Zip Code</Label>
+                    <Label>Delivery Postcode</Label>
                     <Input
                       value={editingBooking.deliveryZipCode || ''}
                       onChange={(e) => setEditingBooking({ ...editingBooking, deliveryZipCode: e.target.value })}
