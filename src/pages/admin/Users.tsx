@@ -4,9 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Search, Loader2, Edit, Trash2, MessageSquare } from 'lucide-react'
+import { Search, Loader2, Edit, Trash2, MessageSquare, Plus } from 'lucide-react'
 import { formatDate } from '@/utils/format'
-import { useAdminUsers, useUpdateUser, useDeleteUser, useAddUserNote } from '@/hooks/useAdmin'
+import { useAdminUsers, useUpdateUser, useDeleteUser, useAddUserNote, useCreateUser } from '@/hooks/useAdmin'
 import {
   Dialog,
   DialogContent,
@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { CheckCircle2, XCircle } from 'lucide-react'
 
@@ -41,6 +42,14 @@ const UsersPage = () => {
   const [noteType, setNoteType] = useState<'call' | 'issue' | 'general'>('general')
   const [successMessage, setSuccessMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+  const [newUser, setNewUser] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    role: 'driver' as 'admin' | 'driver' | 'customer',
+    sendInvite: true,
+  })
 
   const { data, isLoading } = useAdminUsers({
     page,
@@ -52,6 +61,7 @@ const UsersPage = () => {
   const updateUserMutation = useUpdateUser()
   const deleteUserMutation = useDeleteUser()
   const addNoteMutation = useAddUserNote()
+  const createUserMutation = useCreateUser()
 
   const handleEdit = (user: any) => {
     setEditingUser(user)
@@ -119,6 +129,20 @@ const UsersPage = () => {
     }
   }
 
+  const handleCreateUser = async () => {
+    if (!newUser.name.trim() || !newUser.email.trim()) return
+    try {
+      const result = await createUserMutation.mutateAsync(newUser)
+      setIsCreateDialogOpen(false)
+      setNewUser({ name: '', email: '', phone: '', role: 'driver', sendInvite: true })
+      setSuccessMessage(result.message + (result.inviteStatus === 'sent' ? ' Invite email sent.' : ''))
+      setTimeout(() => setSuccessMessage(''), 4000)
+    } catch (error: any) {
+      setErrorMessage(error.response?.data?.message || 'Failed to create user')
+      setTimeout(() => setErrorMessage(''), 4000)
+    }
+  }
+
   const getRoleBadgeVariant = (role: string) => {
     switch (role) {
       case 'admin':
@@ -135,9 +159,15 @@ const UsersPage = () => {
   return (
     <DashboardLayout role="admin">
       <div className="space-y-6">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">User Management</h2>
-          <p className="text-muted-foreground">Manage all users, drivers, and customers</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl font-bold tracking-tight">User Management</h2>
+            <p className="text-muted-foreground">Manage all users, drivers, and customers</p>
+          </div>
+          <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add user
+          </Button>
         </div>
 
         {successMessage && (
@@ -207,7 +237,13 @@ const UsersPage = () => {
                         <div className="flex items-center gap-2">
                           <h3 className="font-medium">{user.name}</h3>
                           <Badge variant={getRoleBadgeVariant(user.role)}>{user.role}</Badge>
-                          {!user.isActive && (
+                          {user.applicationStatus === 'pending' && (
+                            <Badge variant="secondary">Application pending</Badge>
+                          )}
+                          {user.applicationStatus === 'rejected' && (
+                            <Badge variant="destructive">Application declined</Badge>
+                          )}
+                          {!user.isActive && !user.applicationStatus && (
                             <Badge variant="outline">Inactive</Badge>
                           )}
                         </div>
@@ -506,6 +542,56 @@ const UsersPage = () => {
               </Button>
               <Button onClick={handleAddNote} disabled={!noteText.trim() || addNoteMutation.isLoading}>
                 {addNoteMutation.isLoading ? 'Adding...' : 'Add Note'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add user</DialogTitle>
+              <DialogDescription>
+                Create an admin or driver account. An invite email can be sent to set their password.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Name</Label>
+                <Input value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value })} />
+              </div>
+              <div>
+                <Label>Email</Label>
+                <Input type="email" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} />
+              </div>
+              <div>
+                <Label>Phone</Label>
+                <Input value={newUser.phone} onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })} />
+              </div>
+              <div>
+                <Label>Role</Label>
+                <Select value={newUser.role} onValueChange={(value: 'admin' | 'driver' | 'customer') => setNewUser({ ...newUser, role: value })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="driver">Driver</SelectItem>
+                    <SelectItem value="customer">Customer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="sendInvite"
+                  checked={newUser.sendInvite}
+                  onCheckedChange={(checked) => setNewUser({ ...newUser, sendInvite: checked === true })}
+                />
+                <Label htmlFor="sendInvite">Send account setup invite email</Label>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
+              <Button onClick={handleCreateUser} disabled={createUserMutation.isLoading}>
+                {createUserMutation.isLoading ? 'Creating...' : 'Create user'}
               </Button>
             </DialogFooter>
           </DialogContent>

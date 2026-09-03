@@ -45,7 +45,7 @@ const emptyManualOrder = () => ({
   pickupCity: '',
   pickupZipCode: '',
   pickupDate: '',
-  pickupTime: '10:00',
+  pickupTime: '',
   deliveryAddress: '',
   deliveryCity: '',
   deliveryZipCode: '',
@@ -159,7 +159,8 @@ const BookingsPage = () => {
       order.deliveryAddress.trim() &&
       order.deliveryCity.trim() &&
       order.deliveryZipCode.trim() &&
-      order.pickupDate
+      order.pickupDate &&
+      order.pickupTime.trim()
     const hasPayment =
       order.paymentStatus === 'pending' ||
       (order.paymentStatus === 'paid' && order.paymentMethod)
@@ -290,11 +291,16 @@ const BookingsPage = () => {
 
   const handleRecordAdditionalWork = async () => {
     if (!bookingForOffer || additionalWorkAmount <= 0) return
+    if (!additionalWorkDescription.trim()) {
+      setErrorMessage('Please enter a note explaining the additional amount')
+      setTimeout(() => setErrorMessage(''), 3000)
+      return
+    }
     try {
       await recordPaymentMutation.mutateAsync({
         id: bookingForOffer._id,
         amount: additionalWorkAmount,
-        description: additionalWorkDescription,
+        description: additionalWorkDescription.trim(),
       })
       setIsAdditionalWorkDialogOpen(false)
       setBookingForOffer(null)
@@ -413,20 +419,29 @@ const BookingsPage = () => {
                                 {booking.isDisputed && (
                                   <Badge variant="destructive">Disputed</Badge>
                                 )}
-                                {booking.additionalWorkPayment && (
+                                {booking.additionalWorkPayment ? (
                                   <Badge variant="secondary">+{formatCurrency(booking.additionalWorkPayment)} additional</Badge>
-                                )}
+                                ) : null}
                               </div>
 
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                                 <div className="space-y-1">
                                   <p><strong className="text-muted-foreground">Pickup:</strong> {booking.pickupAddress}, {booking.pickupCity} {booking.pickupZipCode}</p>
                                   <p><strong className="text-muted-foreground">Delivery:</strong> {booking.deliveryAddress}, {booking.deliveryCity} {booking.deliveryZipCode}</p>
-                                  <p><strong className="text-muted-foreground">Date & Time:</strong> {formatDate(booking.pickupDate)} at {booking.pickupTime}</p>
+                                  <p><strong className="text-muted-foreground">Date & Time:</strong> {formatDate(booking.pickupDate)} · {booking.pickupTime}</p>
                                 </div>
                                 <div className="space-y-1">
                                   <p><strong className="text-muted-foreground">Contact:</strong> {booking.contactEmail} | {booking.contactPhone}</p>
-                                  <p><strong className="text-muted-foreground">Price:</strong> {formatCurrency(totalPrice)} {booking.additionalWorkPayment && `(Base: ${formatCurrency(basePrice)})`}</p>
+                                  <p><strong className="text-muted-foreground">Price:</strong> {formatCurrency(totalPrice)} {booking.additionalWorkPayment ? `(Base: ${formatCurrency(basePrice)})` : null}</p>
+                                  {booking.additionalWorkPayment ? (
+                                    <p>
+                                      <strong className="text-muted-foreground">Additional:</strong>{' '}
+                                      {formatCurrency(booking.additionalWorkPayment)}
+                                      {booking.additionalWorkDescription
+                                        ? ` — ${booking.additionalWorkDescription}`
+                                        : null}
+                                    </p>
+                                  ) : null}
                                   {driver && (
                                     <p><strong className="text-muted-foreground">Driver:</strong> {driver.name}</p>
                                   )}
@@ -908,7 +923,8 @@ const BookingsPage = () => {
                 <div>
                   <Label>Pickup Time</Label>
                   <Input
-                    type="time"
+                    type="text"
+                    placeholder="e.g. 10:00 - 11:00 am"
                     value={newManualOrder.pickupTime}
                     onChange={(e) =>
                       setNewManualOrder({ ...newManualOrder, pickupTime: e.target.value })
@@ -1076,7 +1092,8 @@ const BookingsPage = () => {
                   <div>
                     <Label>Pickup Time</Label>
                     <Input
-                      type="time"
+                      type="text"
+                      placeholder="e.g. 10:00 - 11:00 am"
                       value={editingBooking.pickupTime || ''}
                       onChange={(e) => setEditingBooking({ ...editingBooking, pickupTime: e.target.value })}
                     />
@@ -1244,7 +1261,9 @@ const BookingsPage = () => {
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Record Additional Work Payment</DialogTitle>
-              <DialogDescription>Record payment for additional work performed</DialogDescription>
+              <DialogDescription>
+                Add an extra amount with a note explaining why (shown on the booking card and details).
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
@@ -1253,16 +1272,16 @@ const BookingsPage = () => {
                   type="number"
                   step="0.01"
                   min="0"
-                  value={additionalWorkAmount}
-                  onChange={(e) => setAdditionalWorkAmount(parseFloat(e.target.value))}
+                  value={additionalWorkAmount || ''}
+                  onChange={(e) => setAdditionalWorkAmount(parseFloat(e.target.value) || 0)}
                 />
               </div>
               <div>
-                <Label>Description</Label>
+                <Label>Note *</Label>
                 <Textarea
                   value={additionalWorkDescription}
                   onChange={(e) => setAdditionalWorkDescription(e.target.value)}
-                  placeholder="Describe the additional work..."
+                  placeholder="e.g. Extra flight of stairs, waiting time, additional boxes..."
                   rows={3}
                 />
               </div>
@@ -1275,7 +1294,14 @@ const BookingsPage = () => {
               }}>
                 Cancel
               </Button>
-              <Button onClick={handleRecordAdditionalWork} disabled={additionalWorkAmount <= 0 || recordPaymentMutation.isLoading}>
+              <Button
+                onClick={handleRecordAdditionalWork}
+                disabled={
+                  additionalWorkAmount <= 0 ||
+                  !additionalWorkDescription.trim() ||
+                  recordPaymentMutation.isLoading
+                }
+              >
                 {recordPaymentMutation.isLoading ? 'Recording...' : 'Record Payment'}
               </Button>
             </DialogFooter>

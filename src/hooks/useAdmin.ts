@@ -104,6 +104,7 @@ export const useAdminUsers = (params?: {
   page?: number
   limit?: number
   search?: string
+  applicationStatus?: string
 }) => {
   return useQuery(
     ['adminUsers', params],
@@ -298,5 +299,36 @@ export const useAddUserNote = () => {
       },
     }
   )
+}
+
+export const useCreateUser = () => {
+  const queryClient = useQueryClient()
+  return useMutation(
+    (data: { name: string; email: string; role: 'admin' | 'driver' | 'customer'; phone?: string; sendInvite?: boolean }) =>
+      adminApi.createUser(data),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('adminUsers')
+      },
+    }
+  )
+}
+
+export const useApproveDriverApplication = () => {
+  const queryClient = useQueryClient()
+  return useMutation((id: string) => adminApi.approveDriverApplication(id), {
+    onSuccess: () => {
+      queryClient.invalidateQueries('adminUsers')
+    },
+  })
+}
+
+export const useRejectDriverApplication = () => {
+  const queryClient = useQueryClient()
+  return useMutation(({ id, note }: { id: string; note?: string }) => adminApi.rejectDriverApplication(id, note), {
+    onSuccess: () => {
+      queryClient.invalidateQueries('adminUsers')
+    },
+  })
 }
 

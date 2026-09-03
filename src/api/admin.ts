@@ -65,6 +65,21 @@ export interface User {
     type?: 'call' | 'issue' | 'general'
   }[]
   isActive: boolean
+  applicationStatus?: 'pending' | 'approved' | 'rejected'
+  applicationSubmittedAt?: string
+  applicationReviewedAt?: string
+  applicationReviewNote?: string
+  introductionVideoUrl?: string
+  drivingLicence?: string
+  goodsInTransitInsurance?: string
+  publicLiability?: string
+  proofOfAddress?: string
+  vehicleRegistration?: string
+  vehicleCategory?: string
+  vehicleMake?: string
+  vehicleModel?: string
+  vehiclePhoto?: string
+  vehicleBaseLocation?: string
   createdAt: string
   updatedAt: string
 }
@@ -152,6 +167,7 @@ export const adminApi = {
     page?: number
     limit?: number
     search?: string
+    applicationStatus?: string
   }): Promise<PaginatedResponse<User>> => {
     const response = await apiClient.get('/admin/users', { params })
     return response.data
@@ -169,6 +185,30 @@ export const adminApi = {
 
   deleteUser: async (id: string): Promise<{ message: string }> => {
     const response = await apiClient.delete(`/admin/users/${id}`)
+    return response.data
+  },
+
+  createUser: async (data: {
+    name: string
+    email: string
+    role: 'admin' | 'driver' | 'customer'
+    phone?: string
+    sendInvite?: boolean
+  }): Promise<{ message: string; user: User; inviteStatus?: string }> => {
+    const response = await apiClient.post('/admin/users', data)
+    return response.data
+  },
+
+  approveDriverApplication: async (id: string): Promise<{ message: string; inviteStatus: string }> => {
+    const response = await apiClient.post(`/admin/users/${id}/approve-application`)
+    return response.data
+  },
+
+  rejectDriverApplication: async (
+    id: string,
+    note?: string
+  ): Promise<{ message: string; emailStatus: string }> => {
+    const response = await apiClient.post(`/admin/users/${id}/reject-application`, { note })
     return response.data
   },
 

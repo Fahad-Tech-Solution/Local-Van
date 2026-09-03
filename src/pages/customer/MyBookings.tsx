@@ -113,7 +113,7 @@ const MyBookings = () => {
                       <div>
                         <p className="text-sm font-medium">Pickup Date</p>
                         <p className="text-sm text-muted-foreground">
-                          {formatDate(booking.pickupDate)} at {booking.pickupTime}
+                          {formatDate(booking.pickupDate)} · {booking.pickupTime}
                         </p>
                       </div>
                     </div>
@@ -133,13 +133,23 @@ const MyBookings = () => {
                         <p className="text-sm text-muted-foreground">Estimated Price</p>
                         <p className="text-lg font-semibold">{formatCurrency(booking.estimatedPrice)}</p>
                       </div>
-                      {booking.finalPrice && (
+                      {booking.finalPrice ? (
                         <div>
                           <p className="text-sm text-muted-foreground">Final Price</p>
                           <p className="text-lg font-semibold">{formatCurrency(booking.finalPrice)}</p>
                         </div>
-                      )}
+                      ) : null}
                     </div>
+                    {booking.additionalWorkPayment ? (
+                      <div className="mt-3 text-sm">
+                        <p className="font-medium">
+                          Additional: {formatCurrency(booking.additionalWorkPayment)}
+                        </p>
+                        {booking.additionalWorkDescription ? (
+                          <p className="text-muted-foreground">{booking.additionalWorkDescription}</p>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
                 </CardContent>
               </Card>

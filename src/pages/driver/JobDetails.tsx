@@ -200,6 +200,19 @@ const JobDetailsPage = () => {
                   {formatCurrency(offeredPrice)}
                 </span>
               </div>
+              {(job as any).additionalWorkPayment ? (
+                <div className="rounded-md border bg-muted/40 p-3 text-sm">
+                  <p>
+                    <strong>Additional:</strong>{' '}
+                    {formatCurrency((job as any).additionalWorkPayment)}
+                  </p>
+                  {(job as any).additionalWorkDescription ? (
+                    <p className="text-muted-foreground mt-1">
+                      {(job as any).additionalWorkDescription}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
               {canRespondToOffer && offer?.offeredPrice != null && (
                 <p className="text-xs text-muted-foreground">
                   Admin offer (percentage of booking) — not customer list price

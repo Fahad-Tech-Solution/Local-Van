@@ -63,6 +63,8 @@ export interface Booking {
   hours?: number
   men?: number
   vans?: number
+  additionalWorkPayment?: number
+  additionalWorkDescription?: string
   createdAt: string
   updatedAt: string
   completedAt?: string

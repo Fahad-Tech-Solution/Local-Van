@@ -4,6 +4,7 @@ import { ProtectedRoute } from './components/ProtectedRoute'
 import Home from './pages/Home'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import DriverApplication from './pages/DriverApplication'
 import FirstAccess from './pages/FirstAccess'
 import AdminDashboard from './features/admin/AdminDashboard'
 import CustomerDashboard from './features/customer/CustomerDashboard'
@@ -14,6 +15,7 @@ import BookingDetails from './pages/customer/BookingDetails'
 import AdminUsers from './pages/admin/Users'
 import AdminBookings from './pages/admin/Bookings'
 import AdminDrivers from './pages/admin/Drivers'
+import AdminDriverApplications from './pages/admin/DriverApplications'
 import DriverJobs from './pages/driver/Jobs'
 import DriverJobDetails from './pages/driver/JobDetails'
 import DriverVehicle from './pages/driver/Vehicle'
@@ -39,6 +41,7 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/driver-application" element={<DriverApplication />} />
           <Route path="/first-access" element={<FirstAccess />} />
           
           {/* Admin Routes - Protected */}
@@ -60,6 +63,11 @@ function App() {
           <Route path="/admin/drivers" element={
             <ProtectedRoute requiredRole="admin">
               <AdminDrivers />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/driver-applications" element={
+            <ProtectedRoute requiredRole="admin">
+              <AdminDriverApplications />
             </ProtectedRoute>
           } />
           <Route path="/admin/settings" element={

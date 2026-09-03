@@ -262,7 +262,8 @@ const BookingDetails = () => {
                       <Label htmlFor="pickupTime">Pickup Time</Label>
                       <Input
                         id="pickupTime"
-                        type="time"
+                        type="text"
+                        placeholder="e.g. 10:00 - 11:00 am"
                         value={amendData.pickupTime}
                         onChange={(e) => setAmendData({ ...amendData, pickupTime: e.target.value })}
                       />
@@ -330,7 +331,7 @@ const BookingDetails = () => {
               <div className="flex items-center gap-2 mt-4">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <span className="text-sm">
-                  {formatDate(booking.pickupDate)} at {booking.pickupTime}
+                  {formatDate(booking.pickupDate)} · {booking.pickupTime}
                 </span>
               </div>
             </CardContent>
@@ -389,12 +390,24 @@ const BookingDetails = () => {
               <div className="pt-3 border-t">
                 <p className="text-sm text-muted-foreground">Estimated Price</p>
                 <p className="text-2xl font-bold">{formatCurrency(booking.estimatedPrice)}</p>
-                {booking.finalPrice && (
+                {booking.finalPrice ? (
                   <>
                     <p className="text-sm text-muted-foreground mt-2">Final Price</p>
                     <p className="text-xl font-semibold">{formatCurrency(booking.finalPrice)}</p>
                   </>
-                )}
+                ) : null}
+                {booking.additionalWorkPayment ? (
+                  <div className="mt-3 rounded-md border bg-muted/40 p-3">
+                    <p className="text-sm font-medium">
+                      Additional: {formatCurrency(booking.additionalWorkPayment)}
+                    </p>
+                    {booking.additionalWorkDescription ? (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {booking.additionalWorkDescription}
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
                 <Badge className="mt-2">{booking.paymentStatus}</Badge>
               </div>
             </CardContent>

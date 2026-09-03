@@ -62,6 +62,13 @@ export function MovingVanSidebar({ role = 'customer', ...props }: MovingVanSideb
           items: [],
         },
         {
+          title: "Applications",
+          url: "/admin/driver-applications",
+          icon: Briefcase,
+          isActive: location.pathname === "/admin/driver-applications",
+          items: [],
+        },
+        {
           title: "Bookings",
           url: "/admin/bookings",
           icon: FileText,

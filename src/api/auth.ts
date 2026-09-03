@@ -9,7 +9,41 @@ export interface RegisterData {
   email: string
   password: string
   name: string
-  role?: 'customer' | 'driver' | 'admin'
+  role?: 'customer'
+}
+
+export interface DriverApplicationData {
+  name: string
+  email: string
+  phone?: string
+  username?: string
+  address?: string
+  businessName?: string
+  drivingLicence?: string
+  goodsInTransitInsurance?: string
+  publicLiability?: string
+  proofOfAddress?: string
+  vehicleRegistration?: string
+  vehicleCategory?: 'small-van' | 'medium-van' | 'large-van' | 'truck'
+  vehicleMake?: string
+  vehicleModel?: string
+  vehicleSeats?: number
+  vehicleBaseLocation?: string
+  vehicleRegistrationDocumentType?: 'logbook' | 'mot' | 'v5'
+  vehicleRegistrationDocument?: string
+  vehiclePhoto?: string
+  vehicleType?: string
+  vehicleFuelType?: 'petrol' | 'diesel' | 'lpg' | 'hybrid' | 'electric'
+  vehicleTailLift?: boolean
+  vehicleTrailer?: boolean
+  introductionVideoUrl?: string
+  bankDetails?: {
+    accountName?: string
+    accountNumber?: string
+    sortCode?: string
+    bankName?: string
+    bankStatement?: string
+  }
 }
 
 export interface AuthResponse {
@@ -68,6 +102,31 @@ export const authApi = {
     password: string
   }): Promise<AuthResponse & { message: string }> => {
     const response = await apiClient.post('/auth/first-access', data)
+    return response.data
+  },
+
+  submitDriverApplication: async (
+    data: DriverApplicationData
+  ): Promise<{ message: string; userId: string }> => {
+    const response = await apiClient.post('/auth/driver-application', data)
+    return response.data
+  },
+
+  uploadApplicationFile: async (
+    file: File,
+    options?: { folder?: string; type?: 'image' | 'video' }
+  ): Promise<{ url: string; publicId: string }> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const params = new URLSearchParams()
+    if (options?.folder) params.set('folder', options.folder)
+    if (options?.type) params.set('type', options.type)
+    const query = params.toString()
+    const response = await apiClient.post(
+      `/auth/driver-application/upload${query ? `?${query}` : ''}`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    )
     return response.data
   },
 }
