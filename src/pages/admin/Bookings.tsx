@@ -39,6 +39,15 @@ import {
 import { Checkbox } from '@/components/ui/checkbox'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
+const PEOPLE_REQUIRED_OPTIONS = [
+  { value: 1, label: '1 person' },
+  { value: 2, label: '2 people' },
+  { value: 3, label: '3 people' },
+  { value: 4, label: '4 people' },
+  { value: 5, label: '5 people' },
+  { value: 6, label: '6 people' },
+] as const
+
 const emptyManualOrder = () => ({
   customer: { name: '', email: '', phone: '' },
   pickupAddress: '',
@@ -896,18 +905,26 @@ const BookingsPage = () => {
               </div>
               <div>
                 <Label>People Required</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  max="20"
-                  value={newManualOrder.men}
-                  onChange={(e) =>
+                <Select
+                  value={String(newManualOrder.men)}
+                  onValueChange={(value) =>
                     setNewManualOrder({
                       ...newManualOrder,
-                      men: parseInt(e.target.value, 10) || 1,
+                      men: parseInt(value, 10),
                     })
                   }
-                />
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select people required" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PEOPLE_REQUIRED_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={String(option.value)}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
