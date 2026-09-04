@@ -48,6 +48,34 @@ const PEOPLE_REQUIRED_OPTIONS = [
   { value: 6, label: '6 people' },
 ] as const
 
+const VEHICLE_TYPE_OPTIONS = [
+  { value: 'small', label: 'Small' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'large', label: 'Large' },
+  { value: 'luton', label: 'Luton' },
+  { value: 'multi-van', label: 'Multi Van' },
+] as const
+
+type ManualVehicleType = (typeof VEHICLE_TYPE_OPTIONS)[number]['value']
+
+const PICKUP_TIME_OPTIONS = [
+  '6am-7am',
+  '7am-8am',
+  '8am-9am',
+  '9am-10am',
+  '10am-11am',
+  '11am-12pm',
+  '12pm-1pm',
+  '1pm-2pm',
+  '2pm-3pm',
+  '3pm-4pm',
+  '4pm-5pm',
+  '5pm-6pm',
+  '6pm-7pm',
+  '7pm-8pm',
+  '8pm-9pm',
+] as const
+
 const emptyManualOrder = () => ({
   customer: { name: '', email: '', phone: '' },
   pickupAddress: '',
@@ -59,7 +87,7 @@ const emptyManualOrder = () => ({
   deliveryCity: '',
   deliveryZipCode: '',
   serviceType: 'local' as 'local' | 'long-distance' | 'interstate',
-  vehicleType: 'small-van' as 'small-van' | 'medium-van' | 'large-van' | 'truck',
+  vehicleType: 'small' as ManualVehicleType,
   pickupAccess: 'ground' as 'lift' | 'stairs' | 'ground',
   pickupStairsCount: 1,
   deliveryAccess: 'ground' as 'lift' | 'stairs' | 'ground',
@@ -755,7 +783,7 @@ const BookingsPage = () => {
                   <Label>Vehicle Type</Label>
                   <Select
                     value={newManualOrder.vehicleType}
-                    onValueChange={(value: 'small-van' | 'medium-van' | 'large-van' | 'truck') =>
+                    onValueChange={(value: ManualVehicleType) =>
                       setNewManualOrder({ ...newManualOrder, vehicleType: value })
                     }
                   >
@@ -763,10 +791,11 @@ const BookingsPage = () => {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="small-van">Small Van</SelectItem>
-                      <SelectItem value="medium-van">Medium Van</SelectItem>
-                      <SelectItem value="large-van">Large Van</SelectItem>
-                      <SelectItem value="truck">Truck</SelectItem>
+                      {VEHICLE_TYPE_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -939,14 +968,23 @@ const BookingsPage = () => {
                 </div>
                 <div>
                   <Label>Pickup Time</Label>
-                  <Input
-                    type="text"
-                    placeholder="e.g. 10:00 - 11:00 am"
+                  <Select
                     value={newManualOrder.pickupTime}
-                    onChange={(e) =>
-                      setNewManualOrder({ ...newManualOrder, pickupTime: e.target.value })
+                    onValueChange={(value) =>
+                      setNewManualOrder({ ...newManualOrder, pickupTime: value })
                     }
-                  />
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select pickup time" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PICKUP_TIME_OPTIONS.map((slot) => (
+                        <SelectItem key={slot} value={slot}>
+                          {slot}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <div>
@@ -1108,12 +1146,27 @@ const BookingsPage = () => {
                   </div>
                   <div>
                     <Label>Pickup Time</Label>
-                    <Input
-                      type="text"
-                      placeholder="e.g. 10:00 - 11:00 am"
-                      value={editingBooking.pickupTime || ''}
-                      onChange={(e) => setEditingBooking({ ...editingBooking, pickupTime: e.target.value })}
-                    />
+                    <Select
+                      value={
+                        (PICKUP_TIME_OPTIONS as readonly string[]).includes(editingBooking.pickupTime)
+                          ? editingBooking.pickupTime
+                          : undefined
+                      }
+                      onValueChange={(value) =>
+                        setEditingBooking({ ...editingBooking, pickupTime: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={editingBooking.pickupTime || 'Select pickup time'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PICKUP_TIME_OPTIONS.map((slot) => (
+                          <SelectItem key={slot} value={slot}>
+                            {slot}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>

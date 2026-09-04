@@ -20,6 +20,7 @@ import { LocalFilePicker } from '@/components/ui/local-file-picker'
 import { CheckCircle2, Loader2 } from 'lucide-react'
 
 const STEPS = ['Personal', 'Documents', 'Vehicle', 'Bank & Video', 'Submit']
+const BRAND_LOGO_URL = 'https://local-van.com/oobevyhe/2025/10/local-van-footer-logo.png'
 
 type ApplicationFiles = {
   drivingLicence?: File | null
@@ -182,6 +183,11 @@ export default function DriverApplication() {
       <div className="min-h-screen flex items-center justify-center p-4 bg-muted/40">
         <Card className="max-w-lg w-full">
           <CardContent className="pt-8 pb-8 text-center space-y-4">
+            <img
+              src={BRAND_LOGO_URL}
+              alt="Local Van"
+              className="h-12 w-auto mx-auto object-contain"
+            />
             <CheckCircle2 className="h-12 w-12 text-green-600 mx-auto" />
             <h1 className="text-2xl font-bold">Application submitted</h1>
             <p className="text-muted-foreground">
@@ -206,9 +212,18 @@ export default function DriverApplication() {
   return (
     <div className="min-h-screen bg-muted/40 py-8 px-4">
       <div className="max-w-3xl mx-auto space-y-6">
-        <div className="text-center space-y-2">
-          <h1 className="text-3xl font-bold">Drive with Local Van</h1>
-          <p className="text-muted-foreground">Complete this form to apply as a driver partner</p>
+        <div className="text-center space-y-4">
+          <div className="inline-flex items-center justify-center rounded-lg bg-black px-6 py-3">
+            <img
+              src={BRAND_LOGO_URL}
+              alt="Local Van"
+              className="h-14 w-auto max-w-[280px] object-contain"
+            />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-3xl font-bold">Drive with Local Van</h1>
+            <p className="text-muted-foreground">Complete this form to apply as a driver partner</p>
+          </div>
         </div>
 
         <div className="flex justify-center gap-2 flex-wrap">

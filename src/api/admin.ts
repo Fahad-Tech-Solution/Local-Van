@@ -100,7 +100,7 @@ export interface Booking {
   deliveryState?: string
   deliveryZipCode: string
   serviceType: 'local' | 'long-distance' | 'interstate'
-  vehicleType: 'small-van' | 'medium-van' | 'large-van' | 'truck'
+  vehicleType: 'small' | 'medium' | 'large' | 'luton' | 'multi-van' | 'small-van' | 'medium-van' | 'large-van' | 'truck'
   estimatedPrice: number
   finalPrice?: number
   paymentStatus: 'pending' | 'paid' | 'refunded'
@@ -249,7 +249,7 @@ export const adminApi = {
     deliveryCity: string
     deliveryZipCode: string
     serviceType: 'local' | 'long-distance' | 'interstate'
-    vehicleType: 'small-van' | 'medium-van' | 'large-van' | 'truck'
+    vehicleType: 'small' | 'medium' | 'large' | 'luton' | 'multi-van' | 'small-van' | 'medium-van' | 'large-van' | 'truck'
     price: number
     paymentStatus: 'paid' | 'pending'
     paymentMethod?: 'bank-transfer' | 'cash' | 'card' | 'other'
