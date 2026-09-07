@@ -42,6 +42,9 @@ export const getNotificationJobName = (notification: AdminNotification): string 
 }
 
 export const getNotificationLink = (notification: AdminNotification): string => {
+  if (notification.type === 'driver_application') {
+    return '/admin/driver-applications'
+  }
   if (notification.jobId) {
     return `/admin/bookings?search=${encodeURIComponent(
       notification.orderCode || notification.jobId

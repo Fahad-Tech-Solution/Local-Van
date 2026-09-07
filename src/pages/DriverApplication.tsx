@@ -69,6 +69,7 @@ const emptyForm: DriverApplicationData = {
 
 export default function DriverApplication() {
   const [step, setStep] = useState(0)
+  const [highestStepReached, setHighestStepReached] = useState(0)
   const [form, setForm] = useState<DriverApplicationData>(emptyForm)
   const [applicationFiles, setApplicationFiles] = useState<ApplicationFiles>({})
   const [error, setError] = useState('')
@@ -83,21 +84,21 @@ export default function DriverApplication() {
   const updateFile = (key: keyof ApplicationFiles, file: File | null) =>
     setApplicationFiles((prev) => ({ ...prev, [key]: file }))
 
-  const validateStep = (forSubmit = false): boolean => {
+  const validateStep = (forSubmit = false, targetStep = step): boolean => {
     setError('')
-    if (step === 0 || forSubmit) {
+    if (targetStep === 0 || forSubmit) {
       if (!form.name.trim() || !form.email.trim() || !form.phone?.trim()) {
         setError('Name, email, and phone are required')
         return false
       }
     }
-    if (step === 1 || forSubmit) {
+    if (targetStep === 1 || forSubmit) {
       if (!applicationFiles.drivingLicence || !applicationFiles.proofOfAddress) {
         setError('Driving licence and proof of address files are required')
         return false
       }
     }
-    if (step === 2 || forSubmit) {
+    if (targetStep === 2 || forSubmit) {
       if (!form.vehicleRegistration || !form.vehicleCategory || !applicationFiles.vehiclePhoto) {
         setError('Vehicle registration, category, and photo are required')
         return false
@@ -106,9 +107,20 @@ export default function DriverApplication() {
     return true
   }
 
+  const goToStep = (nextStep: number) => {
+    setStep(nextStep)
+    setHighestStepReached((prev) => Math.max(prev, nextStep))
+    setError('')
+  }
+
   const handleNext = () => {
     if (!validateStep()) return
-    setStep((s) => Math.min(s + 1, STEPS.length - 1))
+    goToStep(Math.min(step + 1, STEPS.length - 1))
+  }
+
+  const handleStepClick = (index: number) => {
+    if (index > highestStepReached) return
+    goToStep(index)
   }
 
   const uploadApplicationFiles = async () => {
@@ -227,16 +239,27 @@ export default function DriverApplication() {
         </div>
 
         <div className="flex justify-center gap-2 flex-wrap">
-          {STEPS.map((label, i) => (
-            <span
-              key={label}
-              className={`text-xs px-3 py-1 rounded-full border ${
-                i === step ? 'bg-primary text-primary-foreground border-primary' : 'bg-background'
-              }`}
-            >
-              {i + 1}. {label}
-            </span>
-          ))}
+          {STEPS.map((label, i) => {
+            const isActive = i === step
+            const isReached = i <= highestStepReached
+            return (
+              <button
+                key={label}
+                type="button"
+                onClick={() => handleStepClick(i)}
+                disabled={!isReached}
+                className={`text-xs px-3 py-1 rounded-full border transition-colors ${
+                  isActive
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : isReached
+                      ? 'bg-background hover:bg-muted cursor-pointer'
+                      : 'bg-muted/50 text-muted-foreground cursor-not-allowed opacity-60'
+                }`}
+              >
+                {i + 1}. {label}
+              </button>
+            )
+          })}
         </div>
 
         <Card>
@@ -410,7 +433,7 @@ export default function DriverApplication() {
             )}
 
             <div className="flex justify-between pt-4">
-              <Button type="button" variant="outline" disabled={step === 0} onClick={() => setStep((s) => s - 1)}>
+              <Button type="button" variant="outline" disabled={step === 0} onClick={() => goToStep(step - 1)}>
                 Back
               </Button>
               {step < STEPS.length - 1 ? (

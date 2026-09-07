@@ -27,7 +27,7 @@ export interface AdminStats {
 
 export interface AdminNotification {
   _id: string
-  type: 'offer_accepted' | 'offer_rejected' | 'general'
+  type: 'offer_accepted' | 'offer_rejected' | 'driver_application' | 'general'
   title: string
   message: string
   booking?: string | Booking
