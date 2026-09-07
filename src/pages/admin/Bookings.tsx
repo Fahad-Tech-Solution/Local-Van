@@ -100,6 +100,7 @@ const emptyManualOrder = () => ({
   paymentReference: '',
   specialInstructions: '',
   sendConfirmationEmail: true,
+  status: 'pending' as 'pending' | 'survey',
 })
 
 const BookingsPage = () => {
@@ -242,6 +243,7 @@ const BookingsPage = () => {
         deliveryStairsCount:
           newManualOrder.deliveryAccess === 'stairs' ? newManualOrder.deliveryStairsCount : undefined,
         men: newManualOrder.men,
+        status: newManualOrder.status,
       })
 
       setIsCreateDialogOpen(false)
@@ -453,6 +455,7 @@ const BookingsPage = () => {
                   <SelectItem value="completed">Completed</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                   <SelectItem value="disputed">Disputed</SelectItem>
+                  <SelectItem value="survey">Survey</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -734,19 +737,21 @@ const BookingsPage = () => {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Price (£)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={newManualOrder.price || ''}
-                    onChange={(e) =>
-                      setNewManualOrder({
-                        ...newManualOrder,
-                        price: parseFloat(e.target.value) || 0,
-                      })
+                  <Label>Order Status</Label>
+                  <Select
+                    value={newManualOrder.status}
+                    onValueChange={(value: 'pending' | 'survey') =>
+                      setNewManualOrder({ ...newManualOrder, status: value })
                     }
-                  />
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="survey">Survey</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <Label>Payment Status</Label>
@@ -765,6 +770,21 @@ const BookingsPage = () => {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+              <div>
+                <Label>Price (£)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={newManualOrder.price || ''}
+                  onChange={(e) =>
+                    setNewManualOrder({
+                      ...newManualOrder,
+                      price: parseFloat(e.target.value) || 0,
+                    })
+                  }
+                />
               </div>
               {newManualOrder.paymentStatus === 'paid' && (
                 <div className="grid grid-cols-2 gap-4">
@@ -1087,11 +1107,13 @@ const BookingsPage = () => {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="survey">Survey</SelectItem>
                         <SelectItem value="offered">Offered</SelectItem>
                         <SelectItem value="confirmed">Confirmed</SelectItem>
                         <SelectItem value="in-progress">In Progress</SelectItem>
                         <SelectItem value="completed">Completed</SelectItem>
                         <SelectItem value="cancelled">Cancelled</SelectItem>
+                        <SelectItem value="disputed">Disputed</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

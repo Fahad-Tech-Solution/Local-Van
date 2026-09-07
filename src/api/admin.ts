@@ -88,7 +88,7 @@ export interface Booking {
   _id: string
   customer: User | string
   driver?: User | string
-  status: 'pending' | 'offered' | 'confirmed' | 'in-progress' | 'completed' | 'cancelled' | 'disputed'
+  status: 'pending' | 'offered' | 'confirmed' | 'in-progress' | 'completed' | 'cancelled' | 'disputed' | 'survey'
   pickupAddress: string
   pickupCity: string
   pickupState?: string
@@ -261,6 +261,7 @@ export const adminApi = {
     deliveryAccess?: 'lift' | 'stairs' | 'ground'
     deliveryStairsCount?: number
     men?: number
+    status?: 'pending' | 'survey'
   }): Promise<{
     message: string
     booking: Booking

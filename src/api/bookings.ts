@@ -39,7 +39,7 @@ export interface Booking {
     email: string
     phone?: string
   }
-  status: 'pending' | 'confirmed' | 'in-progress' | 'completed' | 'cancelled'
+  status: 'pending' | 'offered' | 'confirmed' | 'in-progress' | 'completed' | 'cancelled' | 'survey'
   pickupAddress: string
   pickupCity: string
   pickupState: string

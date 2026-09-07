@@ -17,6 +17,8 @@ export const BOOKING_STATUS_STYLES: Record<string, string> = {
     'border-stone-200 bg-stone-100 text-stone-600',
   disputed:
     'border-rose-200 bg-rose-50 text-rose-800',
+  survey:
+    'border-violet-200 bg-violet-50 text-violet-800',
 }
 
 export const OFFER_STATUS_STYLES: Record<string, string> = {
