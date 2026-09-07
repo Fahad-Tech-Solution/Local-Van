@@ -6,13 +6,14 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Textarea } from '@/components/ui/textarea'
-import { Search, Loader2, Edit, Truck, Mail, AlertCircle, PoundSterling, MessageSquare, Users, CheckCircle2, XCircle, Plus } from 'lucide-react'
+import { Search, Loader2, Edit, Truck, Mail, AlertCircle, PoundSterling, MessageSquare, Users, CheckCircle2, XCircle, Plus, RefreshCcw } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/utils/format'
 import { 
   useAdminBookings, 
   useUpdateBookingAdmin,
   useCreateBookingAdmin,
-  useAssignDriver, 
+  useAssignDriver,
+  useReclaimBooking,
   useAdminDrivers, 
   useHandleDispute, 
   useSendEmailReminder,
@@ -133,6 +134,7 @@ const BookingsPage = () => {
   const updateBookingMutation = useUpdateBookingAdmin()
   const createBookingMutation = useCreateBookingAdmin()
   const assignDriverMutation = useAssignDriver()
+  const reclaimBookingMutation = useReclaimBooking()
   const handleDisputeMutation = useHandleDispute()
   const sendReminderMutation = useSendEmailReminder()
   const offerJobMutation = useOfferJobToDrivers()
@@ -355,8 +357,36 @@ const BookingsPage = () => {
   const canOfferJob = (booking: any) =>
     ['pending', 'offered'].includes(booking.status) && !booking.driver
 
+  const canReofferJob = (booking: any) =>
+    !!booking.driver && ['confirmed', 'in-progress', 'offered'].includes(booking.status)
+
   const canAssignDriver = (booking: any) =>
     !['completed', 'cancelled'].includes(booking.status)
+
+  const handleReofferJob = async (booking: any) => {
+    const driverName =
+      booking.driver && typeof booking.driver === 'object'
+        ? booking.driver.name
+        : 'the assigned driver'
+    const confirmed = window.confirm(
+      `Take this job back from ${driverName} and re-offer it to other drivers?`
+    )
+    if (!confirmed) return
+
+    try {
+      const result = await reclaimBookingMutation.mutateAsync({ id: booking._id })
+      setBookingForOffer(result.booking)
+      setSelectedDrivers([])
+      setOfferPercentage(50)
+      setIsOfferDialogOpen(true)
+      setSuccessMessage('Job taken back. Select drivers to re-offer.')
+      setTimeout(() => setSuccessMessage(''), 4000)
+      refetch()
+    } catch (error: any) {
+      setErrorMessage(error.response?.data?.message || 'Failed to take job back for re-offer')
+      setTimeout(() => setErrorMessage(''), 3000)
+    }
+  }
 
   return (
     <DashboardLayout role="admin">
@@ -536,6 +566,15 @@ const BookingsPage = () => {
                               >
                                 <Users className="h-4 w-4 mr-1" />
                                 Offer Job
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleReofferJob(booking)}
+                                disabled={!canReofferJob(booking) || reclaimBookingMutation.isLoading}
+                              >
+                                <RefreshCcw className="h-4 w-4 mr-1" />
+                                Re-offer
                               </Button>
                               <Button
                                 variant="outline"
@@ -1221,7 +1260,10 @@ const BookingsPage = () => {
               <DialogTitle>Offer Job to Drivers</DialogTitle>
               <DialogDescription>
                 {bookingForOffer && (
-                  <span>Base Price: {formatCurrency(bookingForOffer.finalPrice || bookingForOffer.estimatedPrice)}</span>
+                  <span>
+                    Base Price: {formatCurrency(bookingForOffer.finalPrice || bookingForOffer.estimatedPrice)}
+                    {bookingForOffer.status === 'pending' ? ' · Ready to re-offer' : ''}
+                  </span>
                 )}
               </DialogDescription>
             </DialogHeader>

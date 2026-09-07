@@ -222,6 +222,19 @@ export const useAssignDriver = () => {
   )
 }
 
+export const useReclaimBooking = () => {
+  const queryClient = useQueryClient()
+  return useMutation(
+    ({ id, note }: { id: string; note?: string }) => adminApi.reclaimBooking(id, note),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('adminBookings')
+        queryClient.invalidateQueries('adminStats')
+      },
+    }
+  )
+}
+
 export const useHandleDispute = () => {
   const queryClient = useQueryClient()
   return useMutation(

@@ -279,6 +279,11 @@ export const adminApi = {
     return response.data
   },
 
+  reclaimBooking: async (id: string, note?: string): Promise<{ message: string; booking: Booking }> => {
+    const response = await apiClient.post(`/admin/bookings/${id}/reclaim`, { note })
+    return response.data
+  },
+
   handleDispute: async (id: string, data: { resolved: boolean; status?: string }): Promise<{ message: string; booking: Booking }> => {
     const response = await apiClient.post(`/admin/bookings/${id}/handle-dispute`, data)
     return response.data
