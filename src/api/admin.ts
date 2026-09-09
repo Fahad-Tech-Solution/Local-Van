@@ -104,6 +104,8 @@ export interface Booking {
   estimatedPrice: number
   finalPrice?: number
   paymentStatus: 'pending' | 'paid' | 'refunded'
+  paymentMethod?: string | null
+  paymentReference?: string | null
   amountPaid?: number
   orderCode?: string
   miles?: number
@@ -113,6 +115,7 @@ export interface Booking {
   helpersLabel?: string
   vanSize?: string
   manRequired?: string
+  men?: number
   specialInstructions?: string
   contactEmail?: string
   contactPhone?: string
@@ -233,7 +236,10 @@ export const adminApi = {
     return response.data
   },
 
-  updateBooking: async (id: string, data: Partial<Booking>): Promise<{ message: string; booking: Booking }> => {
+  updateBooking: async (
+    id: string,
+    data: Partial<Booking> & Record<string, unknown>
+  ): Promise<{ message: string; booking: Booking }> => {
     const response = await apiClient.put(`/admin/bookings/${id}`, data)
     return response.data
   },

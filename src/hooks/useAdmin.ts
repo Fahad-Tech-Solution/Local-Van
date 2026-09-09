@@ -185,7 +185,8 @@ export const useAdminBookings = (params?: {
 export const useUpdateBookingAdmin = () => {
   const queryClient = useQueryClient()
   return useMutation(
-    ({ id, data }: { id: string; data: Partial<Booking> }) => adminApi.updateBooking(id, data),
+    ({ id, data }: { id: string; data: Partial<Booking> & Record<string, unknown> }) =>
+      adminApi.updateBooking(id, data),
     {
       onSuccess: () => {
         queryClient.invalidateQueries('adminBookings')

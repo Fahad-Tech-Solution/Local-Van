@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import DashboardLayout from '@/components/layouts/DashboardLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Textarea } from '@/components/ui/textarea'
-import { Search, Loader2, Edit, Truck, Mail, AlertCircle, PoundSterling, MessageSquare, Users, CheckCircle2, XCircle, Plus, RefreshCcw } from 'lucide-react'
+import { Search, Loader2, Edit, Truck, Mail, AlertCircle, PoundSterling, MessageSquare, Users, CheckCircle2, XCircle, Plus, RefreshCcw, Eye, MapPin, Package } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/utils/format'
 import { 
   useAdminBookings, 
@@ -39,6 +39,9 @@ import {
 } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Separator } from '@/components/ui/separator'
+
+type AccessType = 'lift' | 'stairs' | 'ground'
 
 const PEOPLE_REQUIRED_OPTIONS = [
   { value: 1, label: '1 person' },
@@ -77,6 +80,82 @@ const PICKUP_TIME_OPTIONS = [
   '8pm-9pm',
 ] as const
 
+const formatAccessLabel = (access?: AccessType, stairsCount?: number): string | undefined => {
+  if (!access) return undefined
+  if (access === 'lift') return 'Lift'
+  if (access === 'ground') return 'Ground floor'
+  if (access === 'stairs') {
+    const count = Math.max(1, stairsCount ?? 1)
+    return count === 1 ? '1 flight of stairs' : `${count} flights of stairs`
+  }
+  return undefined
+}
+
+const parseAccessLabel = (label?: string): { access: AccessType; stairsCount: number } => {
+  if (!label) return { access: 'ground', stairsCount: 1 }
+  const lower = label.toLowerCase()
+  if (lower.includes('lift')) return { access: 'lift', stairsCount: 1 }
+  if (lower.includes('stair')) {
+    const match = label.match(/(\d+)/)
+    return { access: 'stairs', stairsCount: match ? parseInt(match[1], 10) : 1 }
+  }
+  return { access: 'ground', stairsCount: 1 }
+}
+
+const formatPeopleRequired = (men?: number): string | undefined => {
+  if (!men || men < 1) return undefined
+  return men === 1 ? '1 person' : `${men} people`
+}
+
+const vehicleLabel = (value?: string) =>
+  VEHICLE_TYPE_OPTIONS.find((o) => o.value === value)?.label ||
+  value?.split('-').map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(' ') ||
+  '—'
+
+const serviceLabel = (value?: string) => {
+  if (value === 'long-distance') return 'Long Distance'
+  if (value === 'interstate') return 'Interstate'
+  if (value === 'local') return 'Local'
+  return value || '—'
+}
+
+const paymentMethodLabel = (value?: string) => {
+  const map: Record<string, string> = {
+    'bank-transfer': 'Bank Transfer',
+    cash: 'Cash',
+    card: 'Card',
+    other: 'Other',
+  }
+  return value ? map[value] || value : '—'
+}
+
+const SectionShell = ({
+  title,
+  icon,
+  children,
+}: {
+  title: string
+  icon?: ReactNode
+  children: ReactNode
+}) => (
+  <section className="rounded-xl border bg-muted/30 p-4 sm:p-5 space-y-4">
+    <div className="flex items-center gap-2">
+      {icon}
+      <h4 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
+        {title}
+      </h4>
+    </div>
+    {children}
+  </section>
+)
+
+const ReadField = ({ label, value }: { label: string; value?: ReactNode }) => (
+  <div className="space-y-1 min-w-0">
+    <p className="text-xs text-muted-foreground">{label}</p>
+    <p className="text-sm font-medium break-words">{value || '—'}</p>
+  </div>
+)
+
 const emptyManualOrder = () => ({
   customer: { name: '', email: '', phone: '' },
   pickupAddress: '',
@@ -109,12 +188,14 @@ const BookingsPage = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [editingBooking, setEditingBooking] = useState<any>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false)
   const [isOfferDialogOpen, setIsOfferDialogOpen] = useState(false)
   const [isNotesDialogOpen, setIsNotesDialogOpen] = useState(false)
   const [isAdditionalWorkDialogOpen, setIsAdditionalWorkDialogOpen] = useState(false)
   const [bookingToAssign, setBookingToAssign] = useState<string | null>(null)
   const [bookingForOffer, setBookingForOffer] = useState<any>(null)
+  const [viewingBooking, setViewingBooking] = useState<any>(null)
   const [selectedDrivers, setSelectedDrivers] = useState<string[]>([])
   const [offerPercentage, setOfferPercentage] = useState<number>(50)
   const [noteText, setNoteText] = useState('')
@@ -146,35 +227,90 @@ const BookingsPage = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [newManualOrder, setNewManualOrder] = useState(emptyManualOrder)
 
+  const handleView = (booking: any) => {
+    setViewingBooking(booking)
+    setIsViewDialogOpen(true)
+  }
+
   const handleEdit = (booking: any) => {
-    setEditingBooking({ ...booking })
+    const pickup = parseAccessLabel(booking.collectionStairs)
+    const delivery = parseAccessLabel(booking.deliveryStairs)
+    setEditingBooking({
+      ...booking,
+      pickupDate: booking.pickupDate
+        ? new Date(booking.pickupDate).toISOString().split('T')[0]
+        : '',
+      pickupAccess: pickup.access,
+      pickupStairsCount: pickup.stairsCount,
+      deliveryAccess: delivery.access,
+      deliveryStairsCount: delivery.stairsCount,
+      men: booking.men || 2,
+      finalPrice: booking.finalPrice ?? booking.estimatedPrice ?? 0,
+      estimatedPrice: booking.estimatedPrice ?? booking.finalPrice ?? 0,
+      paymentStatus: booking.paymentStatus === 'paid' ? 'paid' : 'pending',
+      paymentMethod: booking.paymentMethod || 'bank-transfer',
+      paymentReference: booking.paymentReference || '',
+      specialInstructions: booking.specialInstructions || '',
+      vehicleType: booking.vehicleType || 'small',
+      serviceType: booking.serviceType || 'local',
+      contactEmail: booking.contactEmail || '',
+      contactPhone: booking.contactPhone || '',
+    })
     setIsEditDialogOpen(true)
   }
 
   const handleSaveEdit = async () => {
     if (!editingBooking) return
     try {
+      const men = Number(editingBooking.men) || 1
+      const price = Number(editingBooking.finalPrice) || 0
       await updateBookingMutation.mutateAsync({
         id: editingBooking._id,
         data: {
           status: editingBooking.status,
-          finalPrice: editingBooking.finalPrice,
+          finalPrice: price,
+          estimatedPrice: price,
           pickupAddress: editingBooking.pickupAddress,
           pickupCity: editingBooking.pickupCity,
           pickupZipCode: editingBooking.pickupZipCode,
-          pickupDate: editingBooking.pickupDate,
+          pickupDate: editingBooking.pickupDate
+            ? new Date(editingBooking.pickupDate).toISOString()
+            : editingBooking.pickupDate,
           pickupTime: editingBooking.pickupTime,
           deliveryAddress: editingBooking.deliveryAddress,
           deliveryCity: editingBooking.deliveryCity,
           deliveryZipCode: editingBooking.deliveryZipCode,
           contactEmail: editingBooking.contactEmail,
           contactPhone: editingBooking.contactPhone,
+          serviceType: editingBooking.serviceType,
+          vehicleType: editingBooking.vehicleType,
+          paymentStatus: editingBooking.paymentStatus,
+          paymentMethod:
+            editingBooking.paymentStatus === 'paid'
+              ? editingBooking.paymentMethod
+              : null,
+          paymentReference:
+            editingBooking.paymentStatus === 'paid'
+              ? editingBooking.paymentReference || null
+              : null,
+          specialInstructions: editingBooking.specialInstructions || undefined,
+          men,
+          manRequired: formatPeopleRequired(men),
+          collectionStairs: formatAccessLabel(
+            editingBooking.pickupAccess,
+            editingBooking.pickupStairsCount
+          ),
+          deliveryStairs: formatAccessLabel(
+            editingBooking.deliveryAccess,
+            editingBooking.deliveryStairsCount
+          ),
         },
       })
       setIsEditDialogOpen(false)
       setEditingBooking(null)
       setSuccessMessage('Booking updated successfully')
       setTimeout(() => setSuccessMessage(''), 3000)
+      refetch()
     } catch (error: any) {
       setErrorMessage(error.response?.data?.message || 'Failed to update booking')
       setTimeout(() => setErrorMessage(''), 3000)
@@ -477,7 +613,7 @@ const BookingsPage = () => {
                       <Card key={booking._id} className="hover:shadow-md transition-shadow">
                         <CardContent className="p-4">
                           <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1 space-y-3">
+                            <div className="flex-1 space-y-3 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <h3 className="font-semibold text-lg">
                                   {customer?.name || 'Unknown Customer'}
@@ -490,19 +626,62 @@ const BookingsPage = () => {
                                   <Badge variant="destructive">Disputed</Badge>
                                 )}
                                 {booking.additionalWorkPayment ? (
-                                  <Badge variant="secondary">+{formatCurrency(booking.additionalWorkPayment)} additional</Badge>
+                                  <Badge variant="secondary">
+                                    +{formatCurrency(booking.additionalWorkPayment)} additional
+                                  </Badge>
                                 ) : null}
                               </div>
 
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                                 <div className="space-y-1">
-                                  <p><strong className="text-muted-foreground">Pickup:</strong> {booking.pickupAddress}, {booking.pickupCity} {booking.pickupZipCode}</p>
-                                  <p><strong className="text-muted-foreground">Delivery:</strong> {booking.deliveryAddress}, {booking.deliveryCity} {booking.deliveryZipCode}</p>
-                                  <p><strong className="text-muted-foreground">Date & Time:</strong> {formatDate(booking.pickupDate)} · {booking.pickupTime}</p>
+                                  <p>
+                                    <strong className="text-muted-foreground">Pickup:</strong>{' '}
+                                    {booking.pickupAddress}, {booking.pickupCity}{' '}
+                                    {booking.pickupZipCode}
+                                  </p>
+                                  <p>
+                                    <strong className="text-muted-foreground">Delivery:</strong>{' '}
+                                    {booking.deliveryAddress}, {booking.deliveryCity}{' '}
+                                    {booking.deliveryZipCode}
+                                  </p>
+                                  <p>
+                                    <strong className="text-muted-foreground">Date & Time:</strong>{' '}
+                                    {formatDate(booking.pickupDate)} · {booking.pickupTime}
+                                  </p>
+                                  {(booking.collectionStairs || booking.deliveryStairs) && (
+                                    <>
+                                      <div className="border-t my-2" />
+                                      {booking.collectionStairs && (
+                                        <p>
+                                          <strong className="text-muted-foreground">
+                                            Pickup access:
+                                          </strong>{' '}
+                                          {booking.collectionStairs}
+                                        </p>
+                                      )}
+                                      {booking.deliveryStairs && (
+                                        <p>
+                                          <strong className="text-muted-foreground">
+                                            Drop-off access:
+                                          </strong>{' '}
+                                          {booking.deliveryStairs}
+                                        </p>
+                                      )}
+                                    </>
+                                  )}
                                 </div>
                                 <div className="space-y-1">
-                                  <p><strong className="text-muted-foreground">Contact:</strong> {booking.contactEmail} | {booking.contactPhone}</p>
-                                  <p><strong className="text-muted-foreground">Price:</strong> {formatCurrency(totalPrice)} {booking.additionalWorkPayment ? `(Base: ${formatCurrency(basePrice)})` : null}</p>
+                                  <p>
+                                    <strong className="text-muted-foreground">Contact:</strong>{' '}
+                                    {booking.contactEmail} | {booking.contactPhone}
+                                  </p>
+                                  <p>
+                                    <strong className="text-muted-foreground">Price:</strong>{' '}
+                                    {formatCurrency(totalPrice)}{' '}
+                                    {booking.additionalWorkPayment
+                                      ? `(Base: ${formatCurrency(basePrice)})`
+                                      : null}
+                                  </p>
                                   {booking.additionalWorkPayment ? (
                                     <p>
                                       <strong className="text-muted-foreground">Additional:</strong>{' '}
@@ -513,16 +692,42 @@ const BookingsPage = () => {
                                     </p>
                                   ) : null}
                                   {driver && (
-                                    <p><strong className="text-muted-foreground">Driver:</strong> {driver.name}</p>
+                                    <>
+                                      <div className="border-t my-2" />
+                                      <p>
+                                        <strong className="text-muted-foreground">Driver:</strong>{' '}
+                                        {driver.name}
+                                      </p>
+                                      {driver.phone && (
+                                        <p>
+                                          <strong className="text-muted-foreground">
+                                            Driver phone:
+                                          </strong>{' '}
+                                          {driver.phone}
+                                        </p>
+                                      )}
+                                      {driver.vehicleRegistration && (
+                                        <p>
+                                          <strong className="text-muted-foreground">
+                                            Vehicle number:
+                                          </strong>{' '}
+                                          {driver.vehicleRegistration}
+                                        </p>
+                                      )}
+                                    </>
                                   )}
                                   {booking.driverOffers && booking.driverOffers.length > 0 && (
                                     <div className="mt-2">
-                                      <p className="text-xs font-medium text-muted-foreground mb-1">Job Offers:</p>
+                                      <p className="text-xs font-medium text-muted-foreground mb-1">
+                                        Job Offers:
+                                      </p>
                                       <div className="flex flex-wrap gap-1">
                                         {booking.driverOffers.map((offer: any, idx: number) => (
                                           <div key={idx} className="flex items-center gap-1">
                                             <StatusBadge status={offer.status} kind="offer" />
-                                            <span className="text-xs">{formatCurrency(offer.offeredPrice)}</span>
+                                            <span className="text-xs">
+                                              {formatCurrency(offer.offeredPrice)}
+                                            </span>
                                           </div>
                                         ))}
                                       </div>
@@ -533,11 +738,15 @@ const BookingsPage = () => {
 
                               {booking.notes && booking.notes.length > 0 && (
                                 <div className="mt-2 pt-2 border-t">
-                                  <p className="text-xs font-medium text-muted-foreground mb-1">Notes ({booking.notes.length}):</p>
+                                  <p className="text-xs font-medium text-muted-foreground mb-1">
+                                    Notes ({booking.notes.length}):
+                                  </p>
                                   <div className="space-y-1">
                                     {booking.notes.slice(-3).map((note: any, idx: number) => (
                                       <p key={idx} className="text-xs text-muted-foreground">
-                                        <span className="font-medium">{note.type}:</span> {note.text.substring(0, 100)}{note.text.length > 100 ? '...' : ''}
+                                        <span className="font-medium">{note.type}:</span>{' '}
+                                        {note.text.substring(0, 100)}
+                                        {note.text.length > 100 ? '...' : ''}
                                       </p>
                                     ))}
                                   </div>
@@ -545,7 +754,15 @@ const BookingsPage = () => {
                               )}
                             </div>
 
-                            <div className="flex flex-col gap-2">
+                            <div className="flex flex-col gap-2 shrink-0">
+                              <Button
+                                variant="default"
+                                size="sm"
+                                onClick={() => handleView(booking)}
+                              >
+                                <Eye className="h-4 w-4 mr-1" />
+                                View
+                              </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -624,7 +841,7 @@ const BookingsPage = () => {
                                 title="Send email reminder to customer"
                               >
                                 <Mail className="h-4 w-4 mr-1" />
-                                👤
+                                Customer
                               </Button>
                               {driver && (
                                 <Button
@@ -637,7 +854,7 @@ const BookingsPage = () => {
                                   title="Send email reminder to driver"
                                 >
                                   <Mail className="h-4 w-4 mr-1" />
-                                  🚗
+                                  Driver
                                 </Button>
                               )}
                               <Button
@@ -1086,150 +1303,533 @@ const BookingsPage = () => {
           </DialogContent>
         </Dialog>
 
+        {/* View Details Dialog */}
+        <Dialog
+          open={isViewDialogOpen}
+          onOpenChange={(open) => {
+            setIsViewDialogOpen(open)
+            if (!open) setViewingBooking(null)
+          }}
+        >
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 flex-wrap">
+                Order details
+                {viewingBooking?.orderCode && (
+                  <Badge variant="outline">#{viewingBooking.orderCode}</Badge>
+                )}
+                {viewingBooking?.status && <StatusBadge status={viewingBooking.status} />}
+              </DialogTitle>
+              <DialogDescription>
+                Full booking information across general, pickup, and drop-off details
+              </DialogDescription>
+            </DialogHeader>
+            {viewingBooking && (
+              <div className="space-y-4">
+                <SectionShell title="General details" icon={<Package className="h-4 w-4 text-muted-foreground" />}>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <ReadField
+                      label="Customer"
+                      value={
+                        typeof viewingBooking.customer === 'object'
+                          ? viewingBooking.customer.name
+                          : '—'
+                      }
+                    />
+                    <ReadField label="Email" value={viewingBooking.contactEmail} />
+                    <ReadField label="Phone" value={viewingBooking.contactPhone} />
+                    <ReadField label="Service type" value={serviceLabel(viewingBooking.serviceType)} />
+                    <ReadField label="Vehicle type" value={vehicleLabel(viewingBooking.vehicleType)} />
+                    <ReadField
+                      label="People required"
+                      value={viewingBooking.manRequired || formatPeopleRequired(viewingBooking.men)}
+                    />
+                    <ReadField
+                      label="Price"
+                      value={formatCurrency(
+                        (viewingBooking.finalPrice || viewingBooking.estimatedPrice || 0) +
+                          (viewingBooking.additionalWorkPayment || 0)
+                      )}
+                    />
+                    <ReadField label="Payment status" value={viewingBooking.paymentStatus} />
+                    <ReadField
+                      label="Payment method"
+                      value={paymentMethodLabel(viewingBooking.paymentMethod)}
+                    />
+                    <ReadField label="Payment reference" value={viewingBooking.paymentReference} />
+                    <ReadField
+                      label="Driver"
+                      value={
+                        typeof viewingBooking.driver === 'object'
+                          ? viewingBooking.driver?.name
+                          : undefined
+                      }
+                    />
+                    <ReadField
+                      label="Special instructions"
+                      value={viewingBooking.specialInstructions}
+                    />
+                  </div>
+                  {viewingBooking.additionalWorkPayment ? (
+                    <>
+                      <Separator />
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <ReadField
+                          label="Additional work"
+                          value={formatCurrency(viewingBooking.additionalWorkPayment)}
+                        />
+                        <ReadField
+                          label="Additional note"
+                          value={viewingBooking.additionalWorkDescription}
+                        />
+                      </div>
+                    </>
+                  ) : null}
+                </SectionShell>
+
+                <SectionShell title="Pickup details" icon={<MapPin className="h-4 w-4 text-muted-foreground" />}>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <ReadField label="Address" value={viewingBooking.pickupAddress} />
+                    <ReadField label="City" value={viewingBooking.pickupCity} />
+                    <ReadField label="Postcode" value={viewingBooking.pickupZipCode} />
+                    <ReadField label="Date" value={formatDate(viewingBooking.pickupDate)} />
+                    <ReadField label="Time" value={viewingBooking.pickupTime} />
+                    <ReadField label="Access" value={viewingBooking.collectionStairs} />
+                  </div>
+                </SectionShell>
+
+                <SectionShell title="Drop-off details" icon={<MapPin className="h-4 w-4 text-muted-foreground" />}>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <ReadField label="Address" value={viewingBooking.deliveryAddress} />
+                    <ReadField label="City" value={viewingBooking.deliveryCity} />
+                    <ReadField label="Postcode" value={viewingBooking.deliveryZipCode} />
+                    <ReadField label="Access" value={viewingBooking.deliveryStairs} />
+                  </div>
+                </SectionShell>
+
+                {viewingBooking.notes?.length > 0 && (
+                  <SectionShell title="Notes">
+                    <div className="space-y-2">
+                      {viewingBooking.notes.map((note: any, idx: number) => (
+                        <div key={idx} className="rounded-lg border bg-background p-3 text-sm">
+                          <p className="text-xs text-muted-foreground mb-1 capitalize">
+                            {note.type || 'general'}
+                            {note.createdAt ? ` · ${formatDate(note.createdAt)}` : ''}
+                          </p>
+                          <p>{note.text}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </SectionShell>
+                )}
+              </div>
+            )}
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>
+                Close
+              </Button>
+              <Button
+                onClick={() => {
+                  if (!viewingBooking) return
+                  setIsViewDialogOpen(false)
+                  handleEdit(viewingBooking)
+                }}
+              >
+                <Edit className="h-4 w-4 mr-1" />
+                Edit order
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         {/* Edit Dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Edit Booking</DialogTitle>
-              <DialogDescription>Update booking details</DialogDescription>
+              <DialogDescription>
+                Update general, pickup, and drop-off details
+              </DialogDescription>
             </DialogHeader>
             {editingBooking && (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Status</Label>
-                    <Select
-                      value={editingBooking.status}
-                      onValueChange={(value) => setEditingBooking({ ...editingBooking, status: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="survey">Survey</SelectItem>
-                        <SelectItem value="offered">Offered</SelectItem>
-                        <SelectItem value="confirmed">Confirmed</SelectItem>
-                        <SelectItem value="in-progress">In Progress</SelectItem>
-                        <SelectItem value="completed">Completed</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
-                        <SelectItem value="disputed">Disputed</SelectItem>
-                      </SelectContent>
-                    </Select>
+                <SectionShell title="General details" icon={<Package className="h-4 w-4 text-muted-foreground" />}>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label>Status</Label>
+                      <Select
+                        value={editingBooking.status}
+                        onValueChange={(value) =>
+                          setEditingBooking({ ...editingBooking, status: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="survey">Survey</SelectItem>
+                          <SelectItem value="offered">Offered</SelectItem>
+                          <SelectItem value="confirmed">Confirmed</SelectItem>
+                          <SelectItem value="in-progress">In Progress</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                          <SelectItem value="cancelled">Cancelled</SelectItem>
+                          <SelectItem value="disputed">Disputed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Price (£)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={editingBooking.finalPrice ?? ''}
+                        onChange={(e) =>
+                          setEditingBooking({
+                            ...editingBooking,
+                            finalPrice: parseFloat(e.target.value) || 0,
+                          })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label>Contact name</Label>
+                      <Input
+                        value={
+                          typeof editingBooking.customer === 'object'
+                            ? editingBooking.customer?.name || ''
+                            : ''
+                        }
+                        disabled
+                      />
+                    </div>
+                    <div>
+                      <Label>Contact email</Label>
+                      <Input
+                        type="email"
+                        value={editingBooking.contactEmail || ''}
+                        onChange={(e) =>
+                          setEditingBooking({ ...editingBooking, contactEmail: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label>Contact phone</Label>
+                      <Input
+                        value={editingBooking.contactPhone || ''}
+                        onChange={(e) =>
+                          setEditingBooking({ ...editingBooking, contactPhone: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label>Payment status</Label>
+                      <Select
+                        value={editingBooking.paymentStatus}
+                        onValueChange={(value: 'paid' | 'pending') =>
+                          setEditingBooking({ ...editingBooking, paymentStatus: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="paid">Paid</SelectItem>
+                          <SelectItem value="pending">Pending</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {editingBooking.paymentStatus === 'paid' && (
+                      <>
+                        <div>
+                          <Label>Payment method</Label>
+                          <Select
+                            value={editingBooking.paymentMethod || 'bank-transfer'}
+                            onValueChange={(value) =>
+                              setEditingBooking({ ...editingBooking, paymentMethod: value })
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="bank-transfer">Bank Transfer</SelectItem>
+                              <SelectItem value="cash">Cash</SelectItem>
+                              <SelectItem value="card">Card</SelectItem>
+                              <SelectItem value="other">Other</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label>Payment reference</Label>
+                          <Input
+                            value={editingBooking.paymentReference || ''}
+                            onChange={(e) =>
+                              setEditingBooking({
+                                ...editingBooking,
+                                paymentReference: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
+                      </>
+                    )}
+                    <div>
+                      <Label>Service type</Label>
+                      <Select
+                        value={editingBooking.serviceType}
+                        onValueChange={(value) =>
+                          setEditingBooking({ ...editingBooking, serviceType: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="local">Local</SelectItem>
+                          <SelectItem value="long-distance">Long Distance</SelectItem>
+                          <SelectItem value="interstate">Interstate</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Vehicle type</Label>
+                      <Select
+                        value={editingBooking.vehicleType}
+                        onValueChange={(value) =>
+                          setEditingBooking({ ...editingBooking, vehicleType: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {VEHICLE_TYPE_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                          {editingBooking.vehicleType &&
+                            !VEHICLE_TYPE_OPTIONS.some(
+                              (o) => o.value === editingBooking.vehicleType
+                            ) && (
+                              <SelectItem value={editingBooking.vehicleType}>
+                                {vehicleLabel(editingBooking.vehicleType)}
+                              </SelectItem>
+                            )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>People required</Label>
+                      <Select
+                        value={String(editingBooking.men || 2)}
+                        onValueChange={(value) =>
+                          setEditingBooking({
+                            ...editingBooking,
+                            men: parseInt(value, 10),
+                          })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PEOPLE_REQUIRED_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={String(option.value)}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   <div>
-                    <Label>Final Price (£)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={editingBooking.finalPrice || editingBooking.estimatedPrice}
-                      onChange={(e) => setEditingBooking({ ...editingBooking, finalPrice: parseFloat(e.target.value) })}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label>Contact Name</Label>
-                  <Input
-                    value={typeof editingBooking.customer === 'object' ? editingBooking.customer.name : ''}
-                    disabled
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Contact Email</Label>
-                    <Input
-                      value={editingBooking.contactEmail || ''}
-                      onChange={(e) => setEditingBooking({ ...editingBooking, contactEmail: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label>Contact Phone</Label>
-                    <Input
-                      value={editingBooking.contactPhone || ''}
-                      onChange={(e) => setEditingBooking({ ...editingBooking, contactPhone: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label>Pickup Address</Label>
-                  <Input
-                    value={editingBooking.pickupAddress || ''}
-                    onChange={(e) => setEditingBooking({ ...editingBooking, pickupAddress: e.target.value })}
-                  />
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <Label>Pickup City</Label>
-                    <Input
-                      value={editingBooking.pickupCity || ''}
-                      onChange={(e) => setEditingBooking({ ...editingBooking, pickupCity: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label>Pickup Postcode</Label>
-                    <Input
-                      value={editingBooking.pickupZipCode || ''}
-                      onChange={(e) => setEditingBooking({ ...editingBooking, pickupZipCode: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label>Delivery Address</Label>
-                  <Input
-                    value={editingBooking.deliveryAddress || ''}
-                    onChange={(e) => setEditingBooking({ ...editingBooking, deliveryAddress: e.target.value })}
-                  />
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <Label>Delivery City</Label>
-                    <Input
-                      value={editingBooking.deliveryCity || ''}
-                      onChange={(e) => setEditingBooking({ ...editingBooking, deliveryCity: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label>Delivery Postcode</Label>
-                    <Input
-                      value={editingBooking.deliveryZipCode || ''}
-                      onChange={(e) => setEditingBooking({ ...editingBooking, deliveryZipCode: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Pickup Date</Label>
-                    <Input
-                      type="date"
-                      value={editingBooking.pickupDate ? new Date(editingBooking.pickupDate).toISOString().split('T')[0] : ''}
-                      onChange={(e) => setEditingBooking({ ...editingBooking, pickupDate: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <Label>Pickup Time</Label>
-                    <Select
-                      value={
-                        (PICKUP_TIME_OPTIONS as readonly string[]).includes(editingBooking.pickupTime)
-                          ? editingBooking.pickupTime
-                          : undefined
+                    <Label>Special instructions</Label>
+                    <Textarea
+                      rows={3}
+                      value={editingBooking.specialInstructions || ''}
+                      onChange={(e) =>
+                        setEditingBooking({
+                          ...editingBooking,
+                          specialInstructions: e.target.value,
+                        })
                       }
-                      onValueChange={(value) =>
-                        setEditingBooking({ ...editingBooking, pickupTime: value })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder={editingBooking.pickupTime || 'Select pickup time'} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PICKUP_TIME_OPTIONS.map((slot) => (
-                          <SelectItem key={slot} value={slot}>
-                            {slot}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    />
                   </div>
-                </div>
+                </SectionShell>
+
+                <SectionShell title="Pickup details" icon={<MapPin className="h-4 w-4 text-muted-foreground" />}>
+                  <div>
+                    <Label>Pickup address</Label>
+                    <Input
+                      value={editingBooking.pickupAddress || ''}
+                      onChange={(e) =>
+                        setEditingBooking({ ...editingBooking, pickupAddress: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label>Pickup city</Label>
+                      <Input
+                        value={editingBooking.pickupCity || ''}
+                        onChange={(e) =>
+                          setEditingBooking({ ...editingBooking, pickupCity: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label>Pickup postcode</Label>
+                      <Input
+                        value={editingBooking.pickupZipCode || ''}
+                        onChange={(e) =>
+                          setEditingBooking({ ...editingBooking, pickupZipCode: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label>Pickup date</Label>
+                      <Input
+                        type="date"
+                        value={editingBooking.pickupDate || ''}
+                        onChange={(e) =>
+                          setEditingBooking({ ...editingBooking, pickupDate: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label>Pickup time</Label>
+                      <Select
+                        value={
+                          (PICKUP_TIME_OPTIONS as readonly string[]).includes(
+                            editingBooking.pickupTime
+                          )
+                            ? editingBooking.pickupTime
+                            : undefined
+                        }
+                        onValueChange={(value) =>
+                          setEditingBooking({ ...editingBooking, pickupTime: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue
+                            placeholder={editingBooking.pickupTime || 'Select pickup time'}
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PICKUP_TIME_OPTIONS.map((slot) => (
+                            <SelectItem key={slot} value={slot}>
+                              {slot}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Pickup access</Label>
+                      <Select
+                        value={editingBooking.pickupAccess || 'ground'}
+                        onValueChange={(value: AccessType) =>
+                          setEditingBooking({ ...editingBooking, pickupAccess: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ground">Ground floor</SelectItem>
+                          <SelectItem value="lift">Lift</SelectItem>
+                          <SelectItem value="stairs">Stairs</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {editingBooking.pickupAccess === 'stairs' && (
+                      <div>
+                        <Label>Pickup stairs (flights)</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          max="50"
+                          value={editingBooking.pickupStairsCount || 1}
+                          onChange={(e) =>
+                            setEditingBooking({
+                              ...editingBooking,
+                              pickupStairsCount: parseInt(e.target.value, 10) || 1,
+                            })
+                          }
+                        />
+                      </div>
+                    )}
+                  </div>
+                </SectionShell>
+
+                <SectionShell title="Drop-off details" icon={<MapPin className="h-4 w-4 text-muted-foreground" />}>
+                  <div>
+                    <Label>Delivery address</Label>
+                    <Input
+                      value={editingBooking.deliveryAddress || ''}
+                      onChange={(e) =>
+                        setEditingBooking({ ...editingBooking, deliveryAddress: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label>Delivery city</Label>
+                      <Input
+                        value={editingBooking.deliveryCity || ''}
+                        onChange={(e) =>
+                          setEditingBooking({ ...editingBooking, deliveryCity: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label>Delivery postcode</Label>
+                      <Input
+                        value={editingBooking.deliveryZipCode || ''}
+                        onChange={(e) =>
+                          setEditingBooking({ ...editingBooking, deliveryZipCode: e.target.value })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label>Delivery access</Label>
+                      <Select
+                        value={editingBooking.deliveryAccess || 'ground'}
+                        onValueChange={(value: AccessType) =>
+                          setEditingBooking({ ...editingBooking, deliveryAccess: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ground">Ground floor</SelectItem>
+                          <SelectItem value="lift">Lift</SelectItem>
+                          <SelectItem value="stairs">Stairs</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {editingBooking.deliveryAccess === 'stairs' && (
+                      <div>
+                        <Label>Delivery stairs (flights)</Label>
+                        <Input
+                          type="number"
+                          min="1"
+                          max="50"
+                          value={editingBooking.deliveryStairsCount || 1}
+                          onChange={(e) =>
+                            setEditingBooking({
+                              ...editingBooking,
+                              deliveryStairsCount: parseInt(e.target.value, 10) || 1,
+                            })
+                          }
+                        />
+                      </div>
+                    )}
+                  </div>
+                </SectionShell>
               </div>
             )}
             <DialogFooter>
