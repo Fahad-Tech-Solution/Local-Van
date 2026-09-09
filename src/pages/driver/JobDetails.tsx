@@ -27,6 +27,7 @@ import {
 import { useAuth } from '@/hooks/useAuth'
 import { getOfferForDriver } from '@/utils/driverOffers'
 import { formatCurrency, formatDate, formatDateTime } from '@/utils/format'
+import { formatStairsDisplay } from '@/utils/stairsAccess'
 import {
   Dialog,
   DialogContent,
@@ -258,12 +259,14 @@ const JobDetailsPage = () => {
               ) : null}
               {(job as any).collectionStairs && (
                 <p>
-                  <strong>Collection stairs:</strong> {(job as any).collectionStairs}
+                  <strong>Collection access:</strong>{' '}
+                  {formatStairsDisplay((job as any).collectionStairs)}
                 </p>
               )}
               {(job as any).deliveryStairs && (
                 <p>
-                  <strong>Delivery stairs:</strong> {(job as any).deliveryStairs}
+                  <strong>Delivery access:</strong>{' '}
+                  {formatStairsDisplay((job as any).deliveryStairs)}
                 </p>
               )}
               {additionalInfo && (
@@ -275,10 +278,10 @@ const JobDetailsPage = () => {
                         (job as any).helpersLabel,
                         (job as any).durationRequired,
                         (job as any).collectionStairs
-                          ? `Collection stairs: ${(job as any).collectionStairs}`
+                          ? `Collection access: ${formatStairsDisplay((job as any).collectionStairs)}`
                           : null,
                         (job as any).deliveryStairs
-                          ? `Delivery stairs: ${(job as any).deliveryStairs}`
+                          ? `Delivery access: ${formatStairsDisplay((job as any).deliveryStairs)}`
                           : null,
                       ]
                         .filter(Boolean)

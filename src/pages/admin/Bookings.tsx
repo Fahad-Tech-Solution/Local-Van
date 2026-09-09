@@ -8,6 +8,12 @@ import { StatusBadge } from '@/components/StatusBadge'
 import { Textarea } from '@/components/ui/textarea'
 import { Search, Loader2, Edit, Truck, Mail, AlertCircle, PoundSterling, MessageSquare, Users, CheckCircle2, XCircle, Plus, RefreshCcw, Eye, MapPin, Package } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/utils/format'
+import {
+  formatAccessFromAdmin,
+  formatStairsDisplay,
+  parseStairsAccess,
+  type AccessType,
+} from '@/utils/stairsAccess'
 import { 
   useAdminBookings, 
   useUpdateBookingAdmin,
@@ -40,8 +46,6 @@ import {
 import { Checkbox } from '@/components/ui/checkbox'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Separator } from '@/components/ui/separator'
-
-type AccessType = 'lift' | 'stairs' | 'ground'
 
 const PEOPLE_REQUIRED_OPTIONS = [
   { value: 1, label: '1 person' },
@@ -79,28 +83,6 @@ const PICKUP_TIME_OPTIONS = [
   '7pm-8pm',
   '8pm-9pm',
 ] as const
-
-const formatAccessLabel = (access?: AccessType, stairsCount?: number): string | undefined => {
-  if (!access) return undefined
-  if (access === 'lift') return 'Lift'
-  if (access === 'ground') return 'Ground floor'
-  if (access === 'stairs') {
-    const count = Math.max(1, stairsCount ?? 1)
-    return count === 1 ? '1 flight of stairs' : `${count} flights of stairs`
-  }
-  return undefined
-}
-
-const parseAccessLabel = (label?: string): { access: AccessType; stairsCount: number } => {
-  if (!label) return { access: 'ground', stairsCount: 1 }
-  const lower = label.toLowerCase()
-  if (lower.includes('lift')) return { access: 'lift', stairsCount: 1 }
-  if (lower.includes('stair')) {
-    const match = label.match(/(\d+)/)
-    return { access: 'stairs', stairsCount: match ? parseInt(match[1], 10) : 1 }
-  }
-  return { access: 'ground', stairsCount: 1 }
-}
 
 const formatPeopleRequired = (men?: number): string | undefined => {
   if (!men || men < 1) return undefined
@@ -233,8 +215,8 @@ const BookingsPage = () => {
   }
 
   const handleEdit = (booking: any) => {
-    const pickup = parseAccessLabel(booking.collectionStairs)
-    const delivery = parseAccessLabel(booking.deliveryStairs)
+    const pickup = parseStairsAccess(booking.collectionStairs)
+    const delivery = parseStairsAccess(booking.deliveryStairs)
     setEditingBooking({
       ...booking,
       pickupDate: booking.pickupDate
@@ -296,11 +278,11 @@ const BookingsPage = () => {
           specialInstructions: editingBooking.specialInstructions || undefined,
           men,
           manRequired: formatPeopleRequired(men),
-          collectionStairs: formatAccessLabel(
+          collectionStairs: formatAccessFromAdmin(
             editingBooking.pickupAccess,
             editingBooking.pickupStairsCount
           ),
-          deliveryStairs: formatAccessLabel(
+          deliveryStairs: formatAccessFromAdmin(
             editingBooking.deliveryAccess,
             editingBooking.deliveryStairsCount
           ),
@@ -656,7 +638,7 @@ const BookingsPage = () => {
                                           <strong className="text-muted-foreground">
                                             Pickup access:
                                           </strong>{' '}
-                                          {booking.collectionStairs}
+                                          {formatStairsDisplay(booking.collectionStairs)}
                                         </p>
                                       )}
                                       {booking.deliveryStairs && (
@@ -664,7 +646,7 @@ const BookingsPage = () => {
                                           <strong className="text-muted-foreground">
                                             Drop-off access:
                                           </strong>{' '}
-                                          {booking.deliveryStairs}
+                                          {formatStairsDisplay(booking.deliveryStairs)}
                                         </p>
                                       )}
                                     </>
@@ -1394,7 +1376,10 @@ const BookingsPage = () => {
                     <ReadField label="Postcode" value={viewingBooking.pickupZipCode} />
                     <ReadField label="Date" value={formatDate(viewingBooking.pickupDate)} />
                     <ReadField label="Time" value={viewingBooking.pickupTime} />
-                    <ReadField label="Access" value={viewingBooking.collectionStairs} />
+                    <ReadField
+                      label="Access"
+                      value={formatStairsDisplay(viewingBooking.collectionStairs)}
+                    />
                   </div>
                 </SectionShell>
 
@@ -1403,7 +1388,10 @@ const BookingsPage = () => {
                     <ReadField label="Address" value={viewingBooking.deliveryAddress} />
                     <ReadField label="City" value={viewingBooking.deliveryCity} />
                     <ReadField label="Postcode" value={viewingBooking.deliveryZipCode} />
-                    <ReadField label="Access" value={viewingBooking.deliveryStairs} />
+                    <ReadField
+                      label="Access"
+                      value={formatStairsDisplay(viewingBooking.deliveryStairs)}
+                    />
                   </div>
                 </SectionShell>
 
