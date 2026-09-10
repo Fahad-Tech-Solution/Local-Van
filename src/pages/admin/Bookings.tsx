@@ -545,12 +545,12 @@ const BookingsPage = () => {
   return (
     <DashboardLayout role="admin">
       <div className="space-y-6">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4">
           <div>
             <h2 className="text-3xl font-bold tracking-tight">Booking Management</h2>
             <p className="text-muted-foreground">Manage all bookings and assign drivers</p>
           </div>
-          <Button onClick={handleOpenCreateDialog}>
+          <Button onClick={handleOpenCreateDialog} className="w-fit shrink-0">
             <Plus className="h-4 w-4 mr-2" />
             Add Manual Order
           </Button>
@@ -578,8 +578,8 @@ const BookingsPage = () => {
             <CardDescription>Search and filter bookings</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex gap-4 mb-4">
-              <div className="flex-1 relative">
+            <div className="flex flex-col gap-3 mb-4 md:flex-row md:gap-4">
+              <div className="flex-1 relative min-w-0 w-full">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search by name, email, or order code..."
@@ -595,7 +595,7 @@ const BookingsPage = () => {
                 setStatusFilter(value)
                 setPage(1)
               }}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full md:w-[180px]">
                   <SelectValue placeholder="All Statuses" />
                 </SelectTrigger>
                 <SelectContent>
@@ -628,7 +628,7 @@ const BookingsPage = () => {
                     return (
                       <Card key={booking._id} className="hover:shadow-md transition-shadow">
                         <CardContent className="p-4">
-                          <div className="flex items-start justify-between gap-4">
+                          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                             <div className="flex-1 space-y-3 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <h3 className="font-semibold text-lg">
@@ -770,7 +770,7 @@ const BookingsPage = () => {
                               )}
                             </div>
 
-                            <div className="flex flex-col gap-2 shrink-0">
+                            <div className="flex flex-col gap-2 w-4/5 md:w-auto md:shrink-0">
                               <Button
                                 variant="default"
                                 size="sm"

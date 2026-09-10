@@ -159,12 +159,12 @@ const UsersPage = () => {
   return (
     <DashboardLayout role="admin">
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-3xl font-bold tracking-tight">User Management</h2>
             <p className="text-muted-foreground">Manage all users, drivers, and customers</p>
           </div>
-          <Button onClick={() => setIsCreateDialogOpen(true)}>
+          <Button onClick={() => setIsCreateDialogOpen(true)} className="w-fit">
             <Plus className="h-4 w-4 mr-2" />
             Add user
           </Button>
@@ -192,8 +192,8 @@ const UsersPage = () => {
             <CardDescription>Search and filter users</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex gap-4 mb-4">
-              <div className="flex-1 relative">
+            <div className="flex flex-col gap-3 mb-4 md:flex-row md:gap-4">
+              <div className="flex-1 relative min-w-0 w-full">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search by name or email..."
@@ -209,7 +209,7 @@ const UsersPage = () => {
                 setRoleFilter(value)
                 setPage(1)
               }}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full md:w-[180px]">
                   <SelectValue placeholder="All Roles" />
                 </SelectTrigger>
                 <SelectContent>
@@ -231,10 +231,10 @@ const UsersPage = () => {
                   {data?.users?.map((user: any) => (
                     <div
                       key={user._id}
-                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50"
+                      className="flex flex-col gap-3 p-4 border rounded-lg hover:bg-muted/50 md:flex-row md:items-center md:justify-between"
                     >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="font-medium">{user.name}</h3>
                           <Badge variant={getRoleBadgeVariant(user.role)}>{user.role}</Badge>
                           {user.applicationStatus === 'pending' && (
@@ -247,7 +247,7 @@ const UsersPage = () => {
                             <Badge variant="outline">Inactive</Badge>
                           )}
                         </div>
-                        <p className="text-sm text-muted-foreground">{user.email}</p>
+                        <p className="text-sm text-muted-foreground break-words">{user.email}</p>
                         {user.phone && (
                           <p className="text-sm text-muted-foreground">{user.phone}</p>
                         )}
