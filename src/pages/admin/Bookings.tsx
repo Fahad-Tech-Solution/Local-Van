@@ -186,6 +186,7 @@ const BookingsPage = () => {
   const [additionalWorkDescription, setAdditionalWorkDescription] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
+  const [editError, setEditError] = useState('')
 
   const { data, isLoading, refetch } = useAdminBookings({
     page,
@@ -238,11 +239,13 @@ const BookingsPage = () => {
       contactEmail: booking.contactEmail || '',
       contactPhone: booking.contactPhone || '',
     })
+    setEditError('')
     setIsEditDialogOpen(true)
   }
 
   const handleSaveEdit = async () => {
     if (!editingBooking) return
+    setEditError('')
     try {
       const men = Number(editingBooking.men) || 1
       const price = Number(editingBooking.finalPrice) || 0
@@ -290,12 +293,12 @@ const BookingsPage = () => {
       })
       setIsEditDialogOpen(false)
       setEditingBooking(null)
+      setEditError('')
       setSuccessMessage('Booking updated successfully')
       setTimeout(() => setSuccessMessage(''), 3000)
       refetch()
     } catch (error: any) {
-      setErrorMessage(error.response?.data?.message || 'Failed to update booking')
-      setTimeout(() => setErrorMessage(''), 3000)
+      setEditError(error.response?.data?.message || 'Failed to update booking')
     }
   }
 
@@ -548,7 +551,7 @@ const BookingsPage = () => {
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search by address, order code, customer name..."
+                  placeholder="Search by name, email, or order code..."
                   value={search}
                   onChange={(e) => {
                     setSearch(e.target.value)
@@ -1431,7 +1434,16 @@ const BookingsPage = () => {
         </Dialog>
 
         {/* Edit Dialog */}
-        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <Dialog
+          open={isEditDialogOpen}
+          onOpenChange={(open) => {
+            setIsEditDialogOpen(open)
+            if (!open) {
+              setEditError('')
+              setEditingBooking(null)
+            }
+          }}
+        >
           <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Edit Booking</DialogTitle>
@@ -1439,6 +1451,13 @@ const BookingsPage = () => {
                 Update general, pickup, and drop-off details
               </DialogDescription>
             </DialogHeader>
+            {editError && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Could not save</AlertTitle>
+                <AlertDescription>{editError}</AlertDescription>
+              </Alert>
+            )}
             {editingBooking && (
               <div className="space-y-4">
                 <SectionShell title="General details" icon={<Package className="h-4 w-4 text-muted-foreground" />}>
