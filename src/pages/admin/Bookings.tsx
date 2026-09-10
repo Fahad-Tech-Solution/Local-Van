@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Textarea } from '@/components/ui/textarea'
-import { Search, Loader2, Edit, Truck, Mail, AlertCircle, PoundSterling, MessageSquare, Users, CheckCircle2, XCircle, Plus, RefreshCcw, Eye, MapPin, Package } from 'lucide-react'
+import { Search, Loader2, Edit, Truck, Mail, AlertCircle, PoundSterling, MessageSquare, Users, CheckCircle2, XCircle, Plus, RefreshCcw, Eye, MapPin, Package, Trash2 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/utils/format'
 import {
   formatAccessFromAdmin,
@@ -18,6 +18,7 @@ import {
   useAdminBookings, 
   useUpdateBookingAdmin,
   useCreateBookingAdmin,
+  useDeleteBookingAdmin,
   useAssignDriver,
   useReclaimBooking,
   useAdminDrivers, 
@@ -198,6 +199,7 @@ const BookingsPage = () => {
   const { data: driversData } = useAdminDrivers({ limit: 100 })
   const updateBookingMutation = useUpdateBookingAdmin()
   const createBookingMutation = useCreateBookingAdmin()
+  const deleteBookingMutation = useDeleteBookingAdmin()
   const assignDriverMutation = useAssignDriver()
   const reclaimBookingMutation = useReclaimBooking()
   const handleDisputeMutation = useHandleDispute()
@@ -238,6 +240,7 @@ const BookingsPage = () => {
       serviceType: booking.serviceType || 'local',
       contactEmail: booking.contactEmail || '',
       contactPhone: booking.contactPhone || '',
+      sendConfirmationEmail: false,
     })
     setEditError('')
     setIsEditDialogOpen(true)
@@ -249,7 +252,7 @@ const BookingsPage = () => {
     try {
       const men = Number(editingBooking.men) || 1
       const price = Number(editingBooking.finalPrice) || 0
-      await updateBookingMutation.mutateAsync({
+      const result = await updateBookingMutation.mutateAsync({
         id: editingBooking._id,
         data: {
           status: editingBooking.status,
@@ -289,16 +292,44 @@ const BookingsPage = () => {
             editingBooking.deliveryAccess,
             editingBooking.deliveryStairsCount
           ),
+          sendConfirmationEmail: editingBooking.sendConfirmationEmail === true,
         },
       })
       setIsEditDialogOpen(false)
       setEditingBooking(null)
       setEditError('')
-      setSuccessMessage('Booking updated successfully')
-      setTimeout(() => setSuccessMessage(''), 3000)
+      setSuccessMessage(result.message || 'Booking updated successfully')
+      setTimeout(() => setSuccessMessage(''), 4000)
       refetch()
     } catch (error: any) {
       setEditError(error.response?.data?.message || 'Failed to update booking')
+    }
+  }
+
+  const handleDeleteBooking = async (booking: any) => {
+    const label = booking.orderCode || booking._id
+    const confirmed = window.confirm(
+      `Delete order ${label}? This cannot be undone.`
+    )
+    if (!confirmed) return
+
+    try {
+      await deleteBookingMutation.mutateAsync(booking._id)
+      if (editingBooking?._id === booking._id) {
+        setIsEditDialogOpen(false)
+        setEditingBooking(null)
+        setEditError('')
+      }
+      if (viewingBooking?._id === booking._id) {
+        setIsViewDialogOpen(false)
+        setViewingBooking(null)
+      }
+      setSuccessMessage('Booking deleted successfully')
+      setTimeout(() => setSuccessMessage(''), 3000)
+      refetch()
+    } catch (error: any) {
+      setErrorMessage(error.response?.data?.message || 'Failed to delete booking')
+      setTimeout(() => setErrorMessage(''), 3000)
     }
   }
 
@@ -850,6 +881,15 @@ const BookingsPage = () => {
                                 <Edit className="h-4 w-4 mr-1" />
                                 Edit
                               </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleDeleteBooking(booking)}
+                                disabled={deleteBookingMutation.isLoading}
+                              >
+                                <Trash2 className="h-4 w-4 mr-1" />
+                                Delete
+                              </Button>
                             </div>
                           </div>
                         </CardContent>
@@ -1258,9 +1298,12 @@ const BookingsPage = () => {
                   rows={3}
                 />
               </div>
-              <div className="flex items-center space-x-2">
+            </div>
+            <div className="sticky bottom-0 z-10 -mx-6 border-t bg-background px-6 pt-3 pb-1 space-y-3">
+              <div className="flex items-start gap-2 rounded-lg border bg-muted/30 p-3">
                 <Checkbox
                   id="sendConfirmationEmail"
+                  className="mt-0.5"
                   checked={newManualOrder.sendConfirmationEmail}
                   onCheckedChange={(checked) =>
                     setNewManualOrder({
@@ -1269,22 +1312,22 @@ const BookingsPage = () => {
                     })
                   }
                 />
-                <Label htmlFor="sendConfirmationEmail" className="font-normal cursor-pointer">
+                <Label htmlFor="sendConfirmationEmail" className="font-normal cursor-pointer leading-snug">
                   Send order confirmation email to customer
                 </Label>
               </div>
+              <DialogFooter className="sm:justify-between gap-2">
+                <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleCreateManualOrder}
+                  disabled={createBookingMutation.isLoading || !isManualOrderValid()}
+                >
+                  {createBookingMutation.isLoading ? 'Creating...' : 'Create Order'}
+                </Button>
+              </DialogFooter>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                onClick={handleCreateManualOrder}
-                disabled={createBookingMutation.isLoading || !isManualOrderValid()}
-              >
-                {createBookingMutation.isLoading ? 'Creating...' : 'Create Order'}
-              </Button>
-            </DialogFooter>
           </DialogContent>
         </Dialog>
 
@@ -1451,13 +1494,6 @@ const BookingsPage = () => {
                 Update general, pickup, and drop-off details
               </DialogDescription>
             </DialogHeader>
-            {editError && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Could not save</AlertTitle>
-                <AlertDescription>{editError}</AlertDescription>
-              </Alert>
-            )}
             {editingBooking && (
               <div className="space-y-4">
                 <SectionShell title="General details" icon={<Package className="h-4 w-4 text-muted-foreground" />}>
@@ -1839,14 +1875,54 @@ const BookingsPage = () => {
                 </SectionShell>
               </div>
             )}
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleSaveEdit} disabled={updateBookingMutation.isLoading}>
-                {updateBookingMutation.isLoading ? 'Saving...' : 'Save'}
-              </Button>
-            </DialogFooter>
+            <div className="sticky bottom-0 z-10 -mx-6 border-t bg-background px-6 pt-3 pb-1 space-y-3">
+              {editingBooking && (
+                <div className="flex items-start gap-2 rounded-lg border bg-muted/30 p-3">
+                  <Checkbox
+                    id="editSendConfirmationEmail"
+                    className="mt-0.5"
+                    checked={editingBooking.sendConfirmationEmail === true}
+                    onCheckedChange={(checked) =>
+                      setEditingBooking({
+                        ...editingBooking,
+                        sendConfirmationEmail: checked === true,
+                      })
+                    }
+                  />
+                  <Label
+                    htmlFor="editSendConfirmationEmail"
+                    className="font-normal cursor-pointer leading-snug"
+                  >
+                    Send order confirmation email to customer
+                  </Label>
+                </div>
+              )}
+              {editError && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Could not save</AlertTitle>
+                  <AlertDescription>{editError}</AlertDescription>
+                </Alert>
+              )}
+              <DialogFooter className="sm:justify-between gap-2">
+                <Button
+                  variant="destructive"
+                  onClick={() => editingBooking && handleDeleteBooking(editingBooking)}
+                  disabled={!editingBooking || deleteBookingMutation.isLoading}
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  {deleteBookingMutation.isLoading ? 'Deleting...' : 'Delete'}
+                </Button>
+                <div className="flex gap-2 w-full sm:w-auto justify-end">
+                  <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleSaveEdit} disabled={updateBookingMutation.isLoading}>
+                    {updateBookingMutation.isLoading ? 'Saving...' : 'Save'}
+                  </Button>
+                </div>
+              </DialogFooter>
+            </div>
           </DialogContent>
         </Dialog>
 

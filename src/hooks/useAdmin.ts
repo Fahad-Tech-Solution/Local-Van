@@ -196,6 +196,16 @@ export const useUpdateBookingAdmin = () => {
   )
 }
 
+export const useDeleteBookingAdmin = () => {
+  const queryClient = useQueryClient()
+  return useMutation((id: string) => adminApi.deleteBooking(id), {
+    onSuccess: () => {
+      queryClient.invalidateQueries('adminBookings')
+      queryClient.invalidateQueries('adminStats')
+    },
+  })
+}
+
 export const useCreateBookingAdmin = () => {
   const queryClient = useQueryClient()
   return useMutation(

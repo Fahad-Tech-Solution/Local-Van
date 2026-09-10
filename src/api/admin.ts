@@ -239,8 +239,13 @@ export const adminApi = {
   updateBooking: async (
     id: string,
     data: Partial<Booking> & Record<string, unknown>
-  ): Promise<{ message: string; booking: Booking }> => {
+  ): Promise<{ message: string; booking: Booking; emails?: { confirmation: string } }> => {
     const response = await apiClient.put(`/admin/bookings/${id}`, data)
+    return response.data
+  },
+
+  deleteBooking: async (id: string): Promise<{ message: string; bookingId: string }> => {
+    const response = await apiClient.delete(`/admin/bookings/${id}`)
     return response.data
   },
 
