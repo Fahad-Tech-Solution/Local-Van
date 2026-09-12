@@ -157,21 +157,12 @@ export const useAdminDrivers = (params?: {
   page?: number
   limit?: number
   search?: string
-  activeStatus?: 'all' | 'active' | 'inactive'
 }) => {
-  const activeStatus = params?.activeStatus || 'all'
   return useQuery(
-    ['adminDrivers', params?.page, params?.limit, params?.search || '', activeStatus],
-    () =>
-      adminApi.getAllDrivers({
-        page: params?.page,
-        limit: params?.limit,
-        search: params?.search,
-        activeStatus,
-      }),
+    ['adminDrivers', params],
+    () => adminApi.getAllDrivers(params),
     {
-      staleTime: 0,
-      keepPreviousData: false,
+      staleTime: 10 * 1000,
     }
   )
 }

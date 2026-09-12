@@ -235,16 +235,8 @@ export const adminApi = {
     page?: number
     limit?: number
     search?: string
-    activeStatus?: 'all' | 'active' | 'inactive'
   }): Promise<PaginatedResponse<User & { stats: { totalJobs: number; completedJobs: number; activeJobs: number } }>> => {
-    const response = await apiClient.get('/admin/drivers', {
-      params: {
-        page: params?.page,
-        limit: params?.limit,
-        search: params?.search || undefined,
-        activeStatus: params?.activeStatus || 'all',
-      },
-    })
+    const response = await apiClient.get('/admin/drivers', { params })
     return response.data
   },
 

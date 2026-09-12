@@ -42,18 +42,16 @@ const Section = ({ title, children }: { title: string; children: ReactNode }) =>
 const DriversPage = () => {
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
-  const [activeFilter, setActiveFilter] = useState<'all' | 'active' | 'inactive'>('active')
   const [message, setMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
   const [viewingDriver, setViewingDriver] = useState<any>(null)
   const [editingDriver, setEditingDriver] = useState<any>(null)
   const [isEditOpen, setIsEditOpen] = useState(false)
 
-  const { data, isLoading, isFetching, refetch } = useAdminDrivers({
+  const { data, isLoading, refetch } = useAdminDrivers({
     page,
     limit: 10,
     search: search || undefined,
-    activeStatus: activeFilter,
   })
   const resendApprovalMutation = useResendDriverApprovalInvite()
   const updateUserMutation = useUpdateUser()
@@ -128,8 +126,8 @@ const DriversPage = () => {
             <CardDescription>Search and view driver information</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col gap-3 mb-4 md:flex-row md:gap-4">
-              <div className="flex-1 relative min-w-0 w-full">
+            <div className="flex gap-4 mb-4">
+              <div className="flex-1 relative min-w-0">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search by name or email..."
@@ -141,36 +139,14 @@ const DriversPage = () => {
                   className="pl-10"
                 />
               </div>
-              <Select
-                value={activeFilter}
-                onValueChange={(value: 'all' | 'active' | 'inactive') => {
-                  setActiveFilter(value)
-                  setPage(1)
-                }}
-              >
-                <SelectTrigger className="w-full md:w-[180px]">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Drivers</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
 
-            {isLoading || isFetching ? (
+            {isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
             ) : !data?.drivers?.length ? (
-              <p className="text-center text-muted-foreground py-12">
-                {activeFilter === 'inactive'
-                  ? 'No inactive drivers found'
-                  : activeFilter === 'active'
-                    ? 'No active drivers found'
-                    : 'No drivers found'}
-              </p>
+              <p className="text-center text-muted-foreground py-12">No drivers found</p>
             ) : (
               <>
                 <div className="space-y-2">
