@@ -153,20 +153,23 @@ const DriverApplicationsPage = () => {
             ) : (
               <div className="space-y-3">
                 {applications.map((app: any) => (
-                  <div key={app._id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <div className="flex items-center gap-2">
+                  <div
+                    key={app._id}
+                    className="flex flex-col gap-3 p-4 border rounded-lg hover:bg-muted/50 md:flex-row md:items-center md:justify-between"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-medium">{app.name}</h3>
                         <Badge variant="outline">Pending</Badge>
                       </div>
-                      <p className="text-sm text-muted-foreground">{app.email}</p>
+                      <p className="text-sm text-muted-foreground break-words">{app.email}</p>
                       {app.applicationSubmittedAt && (
                         <p className="text-xs text-muted-foreground">
                           Submitted {formatDate(app.applicationSubmittedAt)}
                         </p>
                       )}
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       <Button variant="outline" size="sm" onClick={() => setSelected(app)}>
                         <Eye className="h-4 w-4 mr-1" /> Review
                       </Button>

@@ -66,6 +66,7 @@ export interface User {
   }[]
   isActive: boolean
   applicationStatus?: 'pending' | 'approved' | 'rejected'
+  passwordSetupPending?: boolean
   applicationSubmittedAt?: string
   applicationReviewedAt?: string
   applicationReviewNote?: string
@@ -215,13 +216,35 @@ export const adminApi = {
     return response.data
   },
 
+  resendDriverApprovalInvite: async (
+    id: string
+  ): Promise<{ message: string; inviteStatus: string }> => {
+    const response = await apiClient.post(`/admin/users/${id}/resend-approval-invite`)
+    return response.data
+  },
+
+  resendCustomerInvite: async (
+    id: string
+  ): Promise<{ message: string; inviteStatus: string }> => {
+    const response = await apiClient.post(`/admin/users/${id}/resend-invite`)
+    return response.data
+  },
+
   // Drivers
   getAllDrivers: async (params?: {
     page?: number
     limit?: number
     search?: string
+    activeStatus?: 'all' | 'active' | 'inactive'
   }): Promise<PaginatedResponse<User & { stats: { totalJobs: number; completedJobs: number; activeJobs: number } }>> => {
-    const response = await apiClient.get('/admin/drivers', { params })
+    const response = await apiClient.get('/admin/drivers', {
+      params: {
+        page: params?.page,
+        limit: params?.limit,
+        search: params?.search || undefined,
+        activeStatus: params?.activeStatus || 'all',
+      },
+    })
     return response.data
   },
 

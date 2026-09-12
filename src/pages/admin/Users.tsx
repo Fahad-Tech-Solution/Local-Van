@@ -4,9 +4,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Search, Loader2, Edit, Trash2, MessageSquare, Plus } from 'lucide-react'
+import { Search, Loader2, Edit, Trash2, MessageSquare, Plus, Mail } from 'lucide-react'
 import { formatDate } from '@/utils/format'
-import { useAdminUsers, useUpdateUser, useDeleteUser, useAddUserNote, useCreateUser } from '@/hooks/useAdmin'
+import {
+  useAdminUsers,
+  useUpdateUser,
+  useDeleteUser,
+  useAddUserNote,
+  useCreateUser,
+  useResendDriverApprovalInvite,
+  useResendCustomerInvite,
+} from '@/hooks/useAdmin'
 import {
   Dialog,
   DialogContent,
@@ -62,10 +70,34 @@ const UsersPage = () => {
   const deleteUserMutation = useDeleteUser()
   const addNoteMutation = useAddUserNote()
   const createUserMutation = useCreateUser()
+  const resendApprovalMutation = useResendDriverApprovalInvite()
+  const resendCustomerInviteMutation = useResendCustomerInvite()
 
   const handleEdit = (user: any) => {
     setEditingUser(user)
     setIsEditDialogOpen(true)
+  }
+
+  const handleResendApproval = async (userId: string) => {
+    try {
+      const result = await resendApprovalMutation.mutateAsync(userId)
+      setSuccessMessage(result.message)
+      setTimeout(() => setSuccessMessage(''), 4000)
+    } catch (error: any) {
+      setErrorMessage(error.response?.data?.message || 'Failed to resend approval email')
+      setTimeout(() => setErrorMessage(''), 3000)
+    }
+  }
+
+  const handleResendCustomerInvite = async (userId: string) => {
+    try {
+      const result = await resendCustomerInviteMutation.mutateAsync(userId)
+      setSuccessMessage(result.message)
+      setTimeout(() => setSuccessMessage(''), 4000)
+    } catch (error: any) {
+      setErrorMessage(error.response?.data?.message || 'Failed to resend customer invite')
+      setTimeout(() => setErrorMessage(''), 3000)
+    }
   }
 
   const handleSaveEdit = async () => {
@@ -240,6 +272,14 @@ const UsersPage = () => {
                           {user.applicationStatus === 'pending' && (
                             <Badge variant="secondary">Application pending</Badge>
                           )}
+                          {user.applicationStatus === 'approved' && (
+                            <Badge variant="default">Approved</Badge>
+                          )}
+                          {user.role === 'driver' &&
+                            user.applicationStatus === 'approved' &&
+                            user.passwordSetupPending && (
+                              <Badge variant="secondary">Pending setup</Badge>
+                            )}
                           {user.applicationStatus === 'rejected' && (
                             <Badge variant="destructive">Application declined</Badge>
                           )}
@@ -257,7 +297,33 @@ const UsersPage = () => {
                           </p>
                         )}
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
+                        {user.role === 'driver' &&
+                          user.applicationStatus === 'approved' &&
+                          user.passwordSetupPending && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleResendApproval(user._id)}
+                              disabled={resendApprovalMutation.isLoading}
+                              title="Resend approval / password setup email"
+                            >
+                              <Mail className="h-4 w-4 mr-1" />
+                              Resend
+                            </Button>
+                          )}
+                        {user.role === 'customer' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleResendCustomerInvite(user._id)}
+                            disabled={resendCustomerInviteMutation.isLoading}
+                            title="Resend account setup invite (customer stays active)"
+                          >
+                            <Mail className="h-4 w-4 mr-1" />
+                            Resend
+                          </Button>
+                        )}
                         <Button
                           variant="outline"
                           size="sm"
@@ -323,22 +389,22 @@ const UsersPage = () => {
 
         {/* Edit Dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
+          <DialogContent className="w-[calc(100%-1.5rem)] max-w-lg max-h-[90dvh] overflow-hidden flex flex-col gap-3 p-4 sm:p-6">
+            <DialogHeader className="shrink-0 pr-6 text-left">
               <DialogTitle>Edit User</DialogTitle>
               <DialogDescription>Update user information</DialogDescription>
             </DialogHeader>
             {editingUser && (
-              <div className="space-y-4 max-h-[70vh] overflow-y-auto">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
+              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-4 -mx-1 px-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <div className="space-y-1.5 min-w-0">
                     <Label>Name</Label>
                     <Input
                       value={editingUser.name || ''}
                       onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
                     />
                   </div>
-                  <div>
+                  <div className="space-y-1.5 min-w-0">
                     <Label>Username</Label>
                     <Input
                       value={editingUser.username || ''}
@@ -346,35 +412,35 @@ const UsersPage = () => {
                     />
                   </div>
                 </div>
-                <div>
+                <div className="space-y-1.5">
                   <Label>Email</Label>
                   <Input
                     value={editingUser.email || ''}
                     onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
                   />
                 </div>
-                <div>
+                <div className="space-y-1.5">
                   <Label>Phone</Label>
                   <Input
                     value={editingUser.phone || ''}
                     onChange={(e) => setEditingUser({ ...editingUser, phone: e.target.value })}
                   />
                 </div>
-                <div>
+                <div className="space-y-1.5">
                   <Label>Address</Label>
                   <Input
                     value={editingUser.address || ''}
                     onChange={(e) => setEditingUser({ ...editingUser, address: e.target.value })}
                   />
                 </div>
-                <div>
+                <div className="space-y-1.5">
                   <Label>Business Name</Label>
                   <Input
                     value={editingUser.businessName || ''}
                     onChange={(e) => setEditingUser({ ...editingUser, businessName: e.target.value })}
                   />
                 </div>
-                <div>
+                <div className="space-y-1.5">
                   <Label>Role</Label>
                   <Select
                     value={editingUser.role}
@@ -393,7 +459,7 @@ const UsersPage = () => {
                 <div className="border-t pt-4">
                   <h4 className="font-medium mb-3">Bank Details</h4>
                   <div className="space-y-3">
-                    <div>
+                    <div className="space-y-1.5">
                       <Label>Account Name</Label>
                       <Input
                         value={editingUser.bankDetails?.accountName || ''}
@@ -403,8 +469,8 @@ const UsersPage = () => {
                         })}
                       />
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1.5 min-w-0">
                         <Label>Account Number</Label>
                         <Input
                           value={editingUser.bankDetails?.accountNumber || ''}
@@ -414,7 +480,7 @@ const UsersPage = () => {
                           })}
                         />
                       </div>
-                      <div>
+                      <div className="space-y-1.5 min-w-0">
                         <Label>Sort Code</Label>
                         <Input
                           value={editingUser.bankDetails?.sortCode || ''}
@@ -425,7 +491,7 @@ const UsersPage = () => {
                         />
                       </div>
                     </div>
-                    <div>
+                    <div className="space-y-1.5">
                       <Label>Bank Name</Label>
                       <Input
                         value={editingUser.bankDetails?.bankName || ''}
@@ -437,7 +503,7 @@ const UsersPage = () => {
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 pb-1">
                   <input
                     type="checkbox"
                     id="isActive"
@@ -449,11 +515,11 @@ const UsersPage = () => {
                 </div>
               </div>
             )}
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+            <DialogFooter className="shrink-0 gap-2 sm:gap-0 border-t pt-3">
+              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} className="w-full sm:w-auto">
                 Cancel
               </Button>
-              <Button onClick={handleSaveEdit} disabled={updateUserMutation.isLoading}>
+              <Button onClick={handleSaveEdit} disabled={updateUserMutation.isLoading} className="w-full sm:w-auto">
                 {updateUserMutation.isLoading ? 'Saving...' : 'Save'}
               </Button>
             </DialogFooter>

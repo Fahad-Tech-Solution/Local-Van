@@ -132,6 +132,7 @@ export const useUpdateUser = () => {
     {
       onSuccess: () => {
         queryClient.invalidateQueries('adminUsers')
+        queryClient.invalidateQueries('adminDrivers')
         queryClient.invalidateQueries('adminStats')
       },
     }
@@ -156,12 +157,21 @@ export const useAdminDrivers = (params?: {
   page?: number
   limit?: number
   search?: string
+  activeStatus?: 'all' | 'active' | 'inactive'
 }) => {
+  const activeStatus = params?.activeStatus || 'all'
   return useQuery(
-    ['adminDrivers', params],
-    () => adminApi.getAllDrivers(params),
+    ['adminDrivers', params?.page, params?.limit, params?.search || '', activeStatus],
+    () =>
+      adminApi.getAllDrivers({
+        page: params?.page,
+        limit: params?.limit,
+        search: params?.search,
+        activeStatus,
+      }),
     {
-      staleTime: 10 * 1000,
+      staleTime: 0,
+      keepPreviousData: false,
     }
   )
 }
@@ -350,6 +360,25 @@ export const useApproveDriverApplication = () => {
 export const useRejectDriverApplication = () => {
   const queryClient = useQueryClient()
   return useMutation(({ id, note }: { id: string; note?: string }) => adminApi.rejectDriverApplication(id, note), {
+    onSuccess: () => {
+      queryClient.invalidateQueries('adminUsers')
+    },
+  })
+}
+
+export const useResendDriverApprovalInvite = () => {
+  const queryClient = useQueryClient()
+  return useMutation((id: string) => adminApi.resendDriverApprovalInvite(id), {
+    onSuccess: () => {
+      queryClient.invalidateQueries('adminUsers')
+      queryClient.invalidateQueries('adminDrivers')
+    },
+  })
+}
+
+export const useResendCustomerInvite = () => {
+  const queryClient = useQueryClient()
+  return useMutation((id: string) => adminApi.resendCustomerInvite(id), {
     onSuccess: () => {
       queryClient.invalidateQueries('adminUsers')
     },
