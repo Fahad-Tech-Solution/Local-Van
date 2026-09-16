@@ -291,6 +291,22 @@ const UsersPage = () => {
                         {user.phone && (
                           <p className="text-sm text-muted-foreground">{user.phone}</p>
                         )}
+                        {user.role === 'customer' && user.bookingStats && (
+                          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                            <span>
+                              <strong>Orders:</strong> {user.bookingStats.total}
+                            </span>
+                            <span>
+                              <strong>Pending:</strong> {user.bookingStats.pending}
+                            </span>
+                            <span>
+                              <strong>In progress:</strong> {user.bookingStats.inProgress}
+                            </span>
+                            <span>
+                              <strong>Completed:</strong> {user.bookingStats.completed}
+                            </span>
+                          </div>
+                        )}
                         {user.notes && user.notes.length > 0 && (
                           <p className="text-xs text-muted-foreground mt-1">
                             {user.notes.length} note{user.notes.length !== 1 ? 's' : ''}
@@ -396,6 +412,26 @@ const UsersPage = () => {
             </DialogHeader>
             {editingUser && (
               <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-4 -mx-1 px-1">
+                {editingUser.role === 'customer' && editingUser.bookingStats && (
+                  <div className="rounded-lg border bg-muted/30 p-3 grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Orders placed</p>
+                      <p className="font-semibold text-lg">{editingUser.bookingStats.total}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Pending</p>
+                      <p className="font-semibold text-lg">{editingUser.bookingStats.pending}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">In progress</p>
+                      <p className="font-semibold text-lg">{editingUser.bookingStats.inProgress}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Completed</p>
+                      <p className="font-semibold text-lg">{editingUser.bookingStats.completed}</p>
+                    </div>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div className="space-y-1.5 min-w-0">
                     <Label>Name</Label>

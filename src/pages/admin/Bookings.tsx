@@ -275,12 +275,12 @@ const BookingsPage = () => {
           paymentStatus: editingBooking.paymentStatus,
           paymentMethod:
             editingBooking.paymentStatus === 'paid'
-              ? editingBooking.paymentMethod
-              : null,
+              ? editingBooking.paymentMethod || undefined
+              : undefined,
           paymentReference:
-            editingBooking.paymentStatus === 'paid'
-              ? editingBooking.paymentReference || null
-              : null,
+            editingBooking.paymentStatus === 'paid' && editingBooking.paymentReference?.trim()
+              ? editingBooking.paymentReference.trim()
+              : undefined,
           specialInstructions: editingBooking.specialInstructions || undefined,
           men,
           manRequired: formatPeopleRequired(men),

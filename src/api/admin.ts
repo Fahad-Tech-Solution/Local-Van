@@ -67,6 +67,12 @@ export interface User {
   isActive: boolean
   applicationStatus?: 'pending' | 'approved' | 'rejected'
   passwordSetupPending?: boolean
+  bookingStats?: {
+    total: number
+    pending: number
+    inProgress: number
+    completed: number
+  }
   applicationSubmittedAt?: string
   applicationReviewedAt?: string
   applicationReviewNote?: string
