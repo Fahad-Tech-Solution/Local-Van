@@ -108,6 +108,28 @@ export interface Booking {
   deliveryZipCode: string
   serviceType: 'local' | 'long-distance' | 'interstate'
   vehicleType: 'small' | 'medium' | 'large' | 'luton' | 'multi-van' | 'small-van' | 'medium-van' | 'large-van' | 'truck'
+  vanCounts?: {
+    small: number
+    medium: number
+    large: number
+    luton: number
+  }
+  vans?: number
+  drivers?: number
+  helpers?: number
+  stops?: {
+    address: string
+    city: string
+    zipCode: string
+    access?: 'lift' | 'stairs' | 'ground'
+    stairsCount?: number
+    accessLabel?: string
+  }[]
+  serviceExtras?: {
+    dismantleItems: number
+    assemblyItems: number
+    packingBoxes: number
+  }
   estimatedPrice: number
   finalPrice?: number
   paymentStatus: 'pending' | 'paid' | 'refunded'
@@ -281,7 +303,27 @@ export const adminApi = {
     deliveryCity: string
     deliveryZipCode: string
     serviceType: 'local' | 'long-distance' | 'interstate'
-    vehicleType: 'small' | 'medium' | 'large' | 'luton' | 'multi-van' | 'small-van' | 'medium-van' | 'large-van' | 'truck'
+    vehicleType?: 'small' | 'medium' | 'large' | 'luton' | 'multi-van' | 'small-van' | 'medium-van' | 'large-van' | 'truck'
+    vanCounts?: {
+      small: number
+      medium: number
+      large: number
+      luton: number
+    }
+    helpers?: number
+    drivers?: number
+    stops?: {
+      address: string
+      city: string
+      zipCode: string
+      access?: 'lift' | 'stairs' | 'ground'
+      stairsCount?: number
+    }[]
+    serviceExtras?: {
+      dismantleItems: number
+      assemblyItems: number
+      packingBoxes: number
+    }
     price: number
     paymentStatus: 'paid' | 'pending'
     paymentMethod?: 'bank-transfer' | 'cash' | 'card' | 'other'

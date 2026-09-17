@@ -14,6 +14,24 @@ import {
   parseStairsAccess,
   type AccessType,
 } from '@/utils/stairsAccess'
+import {
+  ASSEMBLY_PRICE_PER_ITEM,
+  DISMANTLE_PRICE_PER_ITEM,
+  PACKING_PRICE_PER_5_BOXES,
+  emptyServiceExtras,
+  emptyStop,
+  emptyVanCounts,
+  formatServiceExtrasLabel,
+  formatVanCountsLabel,
+  serviceExtrasFromBooking,
+  stopsFromBooking,
+  suggestedExtrasTotal,
+  totalVans,
+  vanCountsFromBooking,
+  type BookingStopForm,
+  type ServiceExtrasForm,
+  type VanCounts,
+} from '@/utils/manualBookingExtras'
 import { 
   useAdminBookings, 
   useUpdateBookingAdmin,
@@ -48,14 +66,14 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Separator } from '@/components/ui/separator'
 
-const PEOPLE_REQUIRED_OPTIONS = [
-  { value: 1, label: '1 person' },
-  { value: 2, label: '2 people' },
-  { value: 3, label: '3 people' },
-  { value: 4, label: '4 people' },
-  { value: 5, label: '5 people' },
-  { value: 6, label: '6 people' },
-] as const
+const VAN_SIZE_FIELDS = [
+  { key: 'small' as const, label: 'Small' },
+  { key: 'medium' as const, label: 'Medium' },
+  { key: 'large' as const, label: 'Large' },
+  { key: 'luton' as const, label: 'Luton' },
+]
+
+const PACKING_BOX_OPTIONS = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50]
 
 const VEHICLE_TYPE_OPTIONS = [
   { value: 'small', label: 'Small' },
@@ -64,8 +82,6 @@ const VEHICLE_TYPE_OPTIONS = [
   { value: 'luton', label: 'Luton' },
   { value: 'multi-van', label: 'Multi Van' },
 ] as const
-
-type ManualVehicleType = (typeof VEHICLE_TYPE_OPTIONS)[number]['value']
 
 const PICKUP_TIME_OPTIONS = [
   '6am-7am',
@@ -88,6 +104,15 @@ const PICKUP_TIME_OPTIONS = [
 const formatPeopleRequired = (men?: number): string | undefined => {
   if (!men || men < 1) return undefined
   return men === 1 ? '1 person' : `${men} people`
+}
+
+const formatPeopleSplit = (drivers?: number, helpers?: number, men?: number) => {
+  if (drivers != null || helpers != null) {
+    const d = Number(drivers) || 0
+    const h = Number(helpers) || 0
+    return `${d} driver${d === 1 ? '' : 's'}${h > 0 ? ` + ${h} helper${h === 1 ? '' : 's'}` : ''} (${d + h} total)`
+  }
+  return formatPeopleRequired(men) || '—'
 }
 
 const vehicleLabel = (value?: string) =>
@@ -150,12 +175,14 @@ const emptyManualOrder = () => ({
   deliveryCity: '',
   deliveryZipCode: '',
   serviceType: 'local' as 'local' | 'long-distance' | 'interstate',
-  vehicleType: 'small' as ManualVehicleType,
+  vanCounts: emptyVanCounts(),
+  helpers: 0,
+  stops: [] as BookingStopForm[],
+  serviceExtras: emptyServiceExtras(),
   pickupAccess: 'ground' as 'lift' | 'stairs' | 'ground',
   pickupStairsCount: 1,
   deliveryAccess: 'ground' as 'lift' | 'stairs' | 'ground',
   deliveryStairsCount: 1,
-  men: 2,
   price: 0,
   paymentStatus: 'paid' as 'paid' | 'pending',
   paymentMethod: 'bank-transfer' as 'bank-transfer' | 'cash' | 'card' | 'other',
@@ -220,6 +247,8 @@ const BookingsPage = () => {
   const handleEdit = (booking: any) => {
     const pickup = parseStairsAccess(booking.collectionStairs)
     const delivery = parseStairsAccess(booking.deliveryStairs)
+    const vanCounts = vanCountsFromBooking(booking)
+    const drivers = totalVans(vanCounts)
     setEditingBooking({
       ...booking,
       pickupDate: booking.pickupDate
@@ -229,7 +258,12 @@ const BookingsPage = () => {
       pickupStairsCount: pickup.stairsCount,
       deliveryAccess: delivery.access,
       deliveryStairsCount: delivery.stairsCount,
-      men: booking.men || 2,
+      vanCounts,
+      drivers,
+      helpers: Number(booking.helpers) || Math.max(0, (Number(booking.men) || drivers) - drivers),
+      stops: stopsFromBooking(booking),
+      serviceExtras: serviceExtrasFromBooking(booking),
+      men: drivers + (Number(booking.helpers) || 0),
       finalPrice: booking.finalPrice ?? booking.estimatedPrice ?? 0,
       estimatedPrice: booking.estimatedPrice ?? booking.finalPrice ?? 0,
       paymentStatus: booking.paymentStatus === 'paid' ? 'paid' : 'pending',
@@ -250,7 +284,20 @@ const BookingsPage = () => {
     if (!editingBooking) return
     setEditError('')
     try {
-      const men = Number(editingBooking.men) || 1
+      const vanCounts = editingBooking.vanCounts || emptyVanCounts()
+      const vansTotal = totalVans(vanCounts)
+      if (vansTotal < 1) {
+        setEditError('At least one van is required')
+        return
+      }
+      const helpers = Math.max(0, Number(editingBooking.helpers) || 0)
+      const drivers = vansTotal
+      const men = drivers + helpers
+      const extras = editingBooking.serviceExtras || emptyServiceExtras()
+      if (Number(extras.packingBoxes) % 5 !== 0) {
+        setEditError('Packing boxes must be in steps of 5')
+        return
+      }
       const price = Number(editingBooking.finalPrice) || 0
       const result = await updateBookingMutation.mutateAsync({
         id: editingBooking._id,
@@ -271,7 +318,11 @@ const BookingsPage = () => {
           contactEmail: editingBooking.contactEmail,
           contactPhone: editingBooking.contactPhone,
           serviceType: editingBooking.serviceType,
-          vehicleType: editingBooking.vehicleType,
+          vanCounts,
+          helpers,
+          drivers,
+          stops: editingBooking.stops || [],
+          serviceExtras: extras,
           paymentStatus: editingBooking.paymentStatus,
           paymentMethod:
             editingBooking.paymentStatus === 'paid'
@@ -340,6 +391,7 @@ const BookingsPage = () => {
 
   const isManualOrderValid = () => {
     const order = newManualOrder
+    const vansTotal = totalVans(order.vanCounts)
     const hasCustomer =
       order.customer.name.trim() &&
       order.customer.email.trim() &&
@@ -359,12 +411,31 @@ const BookingsPage = () => {
     const hasAccess =
       (order.pickupAccess !== 'stairs' || order.pickupStairsCount >= 1) &&
       (order.deliveryAccess !== 'stairs' || order.deliveryStairsCount >= 1)
-    return hasCustomer && hasAddresses && order.price > 0 && hasPayment && order.men >= 1 && hasAccess
+    const stopsOk = order.stops.every(
+      (stop) =>
+        stop.address.trim() &&
+        stop.city.trim() &&
+        stop.zipCode.trim() &&
+        (stop.access !== 'stairs' || stop.stairsCount >= 1)
+    )
+    const packingOk = order.serviceExtras.packingBoxes % 5 === 0
+    return (
+      hasCustomer &&
+      hasAddresses &&
+      order.price > 0 &&
+      hasPayment &&
+      vansTotal >= 1 &&
+      hasAccess &&
+      stopsOk &&
+      packingOk
+    )
   }
 
   const handleCreateManualOrder = async () => {
     if (!isManualOrderValid()) return
     try {
+      const vansTotal = totalVans(newManualOrder.vanCounts)
+      const helpers = Math.max(0, Number(newManualOrder.helpers) || 0)
       const result = await createBookingMutation.mutateAsync({
         customer: {
           name: newManualOrder.customer.name.trim(),
@@ -380,7 +451,11 @@ const BookingsPage = () => {
         deliveryCity: newManualOrder.deliveryCity.trim(),
         deliveryZipCode: newManualOrder.deliveryZipCode.trim(),
         serviceType: newManualOrder.serviceType,
-        vehicleType: newManualOrder.vehicleType,
+        vanCounts: newManualOrder.vanCounts,
+        helpers,
+        drivers: vansTotal,
+        stops: newManualOrder.stops,
+        serviceExtras: newManualOrder.serviceExtras,
         price: newManualOrder.price,
         paymentStatus: newManualOrder.paymentStatus,
         paymentMethod:
@@ -394,7 +469,7 @@ const BookingsPage = () => {
         deliveryAccess: newManualOrder.deliveryAccess,
         deliveryStairsCount:
           newManualOrder.deliveryAccess === 'stairs' ? newManualOrder.deliveryStairsCount : undefined,
-        men: newManualOrder.men,
+        men: vansTotal + helpers,
         status: newManualOrder.status,
       })
 
@@ -663,6 +738,16 @@ const BookingsPage = () => {
                                   <p>
                                     <strong className="text-muted-foreground">Date & Time:</strong>{' '}
                                     {formatDate(booking.pickupDate)} · {booking.pickupTime}
+                                  </p>
+                                  <p>
+                                    <strong className="text-muted-foreground">Vans:</strong>{' '}
+                                    {formatVanCountsLabel(booking.vanCounts) !== '—'
+                                      ? formatVanCountsLabel(booking.vanCounts)
+                                      : vehicleLabel(booking.vehicleType)}
+                                  </p>
+                                  <p>
+                                    <strong className="text-muted-foreground">People:</strong>{' '}
+                                    {formatPeopleSplit(booking.drivers, booking.helpers, booking.men)}
                                   </p>
                                   {(booking.collectionStairs || booking.deliveryStairs) && (
                                     <>
@@ -1080,25 +1165,57 @@ const BookingsPage = () => {
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+              <div className="space-y-2 rounded-lg border p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <Label>Vans by size</Label>
+                  <span className="text-xs text-muted-foreground">
+                    Total: {totalVans(newManualOrder.vanCounts)}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {VAN_SIZE_FIELDS.map((field) => (
+                    <div key={field.key}>
+                      <Label className="text-xs">{field.label}</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={20}
+                        value={newManualOrder.vanCounts[field.key]}
+                        onChange={(e) =>
+                          setNewManualOrder({
+                            ...newManualOrder,
+                            vanCounts: {
+                              ...newManualOrder.vanCounts,
+                              [field.key]: Math.max(0, parseInt(e.target.value, 10) || 0),
+                            },
+                          })
+                        }
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Vehicle Type</Label>
-                  <Select
-                    value={newManualOrder.vehicleType}
-                    onValueChange={(value: ManualVehicleType) =>
-                      setNewManualOrder({ ...newManualOrder, vehicleType: value })
+                  <Label>Drivers</Label>
+                  <Input value={totalVans(newManualOrder.vanCounts)} disabled readOnly />
+                  <p className="text-xs text-muted-foreground mt-1">Equals number of vans</p>
+                </div>
+                <div>
+                  <Label>Helpers</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={20}
+                    value={newManualOrder.helpers}
+                    onChange={(e) =>
+                      setNewManualOrder({
+                        ...newManualOrder,
+                        helpers: Math.max(0, parseInt(e.target.value, 10) || 0),
+                      })
                     }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {VEHICLE_TYPE_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  />
                 </div>
               </div>
               <div>
@@ -1233,29 +1350,193 @@ const BookingsPage = () => {
                   </div>
                 )}
               </div>
-              <div>
-                <Label>People Required</Label>
-                <Select
-                  value={String(newManualOrder.men)}
-                  onValueChange={(value) =>
-                    setNewManualOrder({
-                      ...newManualOrder,
-                      men: parseInt(value, 10),
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select people required" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PEOPLE_REQUIRED_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={String(option.value)}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+
+              <div className="space-y-3 rounded-lg border p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <Label>Intermediate stops (optional, max 3)</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={newManualOrder.stops.length >= 3}
+                    onClick={() =>
+                      setNewManualOrder({
+                        ...newManualOrder,
+                        stops: [...newManualOrder.stops, emptyStop()],
+                      })
+                    }
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add stop
+                  </Button>
+                </div>
+                {newManualOrder.stops.map((stop, index) => (
+                  <div key={index} className="space-y-3 rounded-md border bg-muted/20 p-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">Stop {index + 1}</p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          setNewManualOrder({
+                            ...newManualOrder,
+                            stops: newManualOrder.stops.filter((_, i) => i !== index),
+                          })
+                        }
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                    <div>
+                      <Label>Address</Label>
+                      <Input
+                        value={stop.address}
+                        onChange={(e) => {
+                          const stops = [...newManualOrder.stops]
+                          stops[index] = { ...stops[index], address: e.target.value }
+                          setNewManualOrder({ ...newManualOrder, stops })
+                        }}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label>City</Label>
+                        <Input
+                          value={stop.city}
+                          onChange={(e) => {
+                            const stops = [...newManualOrder.stops]
+                            stops[index] = { ...stops[index], city: e.target.value }
+                            setNewManualOrder({ ...newManualOrder, stops })
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <Label>Postcode</Label>
+                        <Input
+                          value={stop.zipCode}
+                          onChange={(e) => {
+                            const stops = [...newManualOrder.stops]
+                            stops[index] = { ...stops[index], zipCode: e.target.value }
+                            setNewManualOrder({ ...newManualOrder, stops })
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label>Access</Label>
+                        <Select
+                          value={stop.access}
+                          onValueChange={(value: 'lift' | 'stairs' | 'ground') => {
+                            const stops = [...newManualOrder.stops]
+                            stops[index] = { ...stops[index], access: value }
+                            setNewManualOrder({ ...newManualOrder, stops })
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="ground">Ground floor</SelectItem>
+                            <SelectItem value="lift">Lift</SelectItem>
+                            <SelectItem value="stairs">Stairs</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {stop.access === 'stairs' && (
+                        <div>
+                          <Label>Stairs (flights)</Label>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={50}
+                            value={stop.stairsCount}
+                            onChange={(e) => {
+                              const stops = [...newManualOrder.stops]
+                              stops[index] = {
+                                ...stops[index],
+                                stairsCount: parseInt(e.target.value, 10) || 1,
+                              }
+                              setNewManualOrder({ ...newManualOrder, stops })
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
+
+              <div className="space-y-3 rounded-lg border p-3">
+                <Label>Extras (line items — price is still entered manually below)</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <Label className="text-xs">Dismantle items (+£{DISMANTLE_PRICE_PER_ITEM} each)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={newManualOrder.serviceExtras.dismantleItems}
+                      onChange={(e) =>
+                        setNewManualOrder({
+                          ...newManualOrder,
+                          serviceExtras: {
+                            ...newManualOrder.serviceExtras,
+                            dismantleItems: Math.max(0, parseInt(e.target.value, 10) || 0),
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Assembly items (+£{ASSEMBLY_PRICE_PER_ITEM} each)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={newManualOrder.serviceExtras.assemblyItems}
+                      onChange={(e) =>
+                        setNewManualOrder({
+                          ...newManualOrder,
+                          serviceExtras: {
+                            ...newManualOrder.serviceExtras,
+                            assemblyItems: Math.max(0, parseInt(e.target.value, 10) || 0),
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Packing boxes (+£{PACKING_PRICE_PER_5_BOXES} / 5)</Label>
+                    <Select
+                      value={String(newManualOrder.serviceExtras.packingBoxes)}
+                      onValueChange={(value) =>
+                        setNewManualOrder({
+                          ...newManualOrder,
+                          serviceExtras: {
+                            ...newManualOrder.serviceExtras,
+                            packingBoxes: parseInt(value, 10) || 0,
+                          },
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PACKING_BOX_OPTIONS.map((n) => (
+                          <SelectItem key={n} value={String(n)}>
+                            {n} boxes
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Suggested extras total: {formatCurrency(suggestedExtrasTotal(newManualOrder.serviceExtras))} (not auto-added)
+                </p>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Pickup Date</Label>
@@ -1367,10 +1648,23 @@ const BookingsPage = () => {
                     <ReadField label="Email" value={viewingBooking.contactEmail} />
                     <ReadField label="Phone" value={viewingBooking.contactPhone} />
                     <ReadField label="Service type" value={serviceLabel(viewingBooking.serviceType)} />
-                    <ReadField label="Vehicle type" value={vehicleLabel(viewingBooking.vehicleType)} />
                     <ReadField
-                      label="People required"
-                      value={viewingBooking.manRequired || formatPeopleRequired(viewingBooking.men)}
+                      label="Vans"
+                      value={formatVanCountsLabel(viewingBooking.vanCounts) !== '—'
+                        ? formatVanCountsLabel(viewingBooking.vanCounts)
+                        : vehicleLabel(viewingBooking.vehicleType)}
+                    />
+                    <ReadField
+                      label="People"
+                      value={formatPeopleSplit(
+                        viewingBooking.drivers,
+                        viewingBooking.helpers,
+                        viewingBooking.men
+                      )}
+                    />
+                    <ReadField
+                      label="Extras"
+                      value={formatServiceExtrasLabel(viewingBooking.serviceExtras)}
                     />
                     <ReadField
                       label="Price"
@@ -1428,6 +1722,28 @@ const BookingsPage = () => {
                     />
                   </div>
                 </SectionShell>
+
+                {Array.isArray(viewingBooking.stops) && viewingBooking.stops.length > 0 && (
+                  <SectionShell title="Intermediate stops" icon={<MapPin className="h-4 w-4 text-muted-foreground" />}>
+                    <div className="space-y-3">
+                      {viewingBooking.stops.map((stop: any, index: number) => (
+                        <div key={index} className="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-lg border bg-background p-3">
+                          <ReadField label={`Stop ${index + 1} address`} value={stop.address} />
+                          <ReadField label="City" value={stop.city} />
+                          <ReadField label="Postcode" value={stop.zipCode} />
+                          <ReadField
+                            label="Access"
+                            value={
+                              stop.accessLabel
+                                ? formatStairsDisplay(stop.accessLabel)
+                                : stop.access || '—'
+                            }
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </SectionShell>
+                )}
 
                 <SectionShell title="Drop-off details" icon={<MapPin className="h-4 w-4 text-muted-foreground" />}>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1635,56 +1951,131 @@ const BookingsPage = () => {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div>
-                      <Label>Vehicle type</Label>
-                      <Select
-                        value={editingBooking.vehicleType}
-                        onValueChange={(value) =>
-                          setEditingBooking({ ...editingBooking, vehicleType: value })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {VEHICLE_TYPE_OPTIONS.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                          {editingBooking.vehicleType &&
-                            !VEHICLE_TYPE_OPTIONS.some(
-                              (o) => o.value === editingBooking.vehicleType
-                            ) && (
-                              <SelectItem value={editingBooking.vehicleType}>
-                                {vehicleLabel(editingBooking.vehicleType)}
-                              </SelectItem>
-                            )}
-                        </SelectContent>
-                      </Select>
+                    <div className="sm:col-span-2 space-y-2 rounded-lg border p-3">
+                      <div className="flex items-center justify-between">
+                        <Label>Vans by size</Label>
+                        <span className="text-xs text-muted-foreground">
+                          Total: {totalVans(editingBooking.vanCounts || emptyVanCounts())}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        {VAN_SIZE_FIELDS.map((field) => (
+                          <div key={field.key}>
+                            <Label className="text-xs">{field.label}</Label>
+                            <Input
+                              type="number"
+                              min={0}
+                              max={20}
+                              value={editingBooking.vanCounts?.[field.key] ?? 0}
+                              onChange={(e) => {
+                                const vanCounts = {
+                                  ...(editingBooking.vanCounts || emptyVanCounts()),
+                                  [field.key]: Math.max(0, parseInt(e.target.value, 10) || 0),
+                                }
+                                setEditingBooking({
+                                  ...editingBooking,
+                                  vanCounts,
+                                  drivers: totalVans(vanCounts),
+                                })
+                              }}
+                            />
+                          </div>
+                        ))}
+                      </div>
                     </div>
                     <div>
-                      <Label>People required</Label>
-                      <Select
-                        value={String(editingBooking.men || 2)}
-                        onValueChange={(value) =>
+                      <Label>Drivers</Label>
+                      <Input
+                        value={totalVans(editingBooking.vanCounts || emptyVanCounts())}
+                        disabled
+                        readOnly
+                      />
+                    </div>
+                    <div>
+                      <Label>Helpers</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={20}
+                        value={editingBooking.helpers ?? 0}
+                        onChange={(e) =>
                           setEditingBooking({
                             ...editingBooking,
-                            men: parseInt(value, 10),
+                            helpers: Math.max(0, parseInt(e.target.value, 10) || 0),
                           })
                         }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {PEOPLE_REQUIRED_OPTIONS.map((option) => (
-                            <SelectItem key={option.value} value={String(option.value)}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      />
+                    </div>
+                    <div className="sm:col-span-2 space-y-2 rounded-lg border p-3">
+                      <Label>Extras (hint only — total price above stays manual)</Label>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <Label className="text-xs">Dismantle (+£{DISMANTLE_PRICE_PER_ITEM})</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            value={editingBooking.serviceExtras?.dismantleItems ?? 0}
+                            onChange={(e) =>
+                              setEditingBooking({
+                                ...editingBooking,
+                                serviceExtras: {
+                                  ...(editingBooking.serviceExtras || emptyServiceExtras()),
+                                  dismantleItems: Math.max(0, parseInt(e.target.value, 10) || 0),
+                                },
+                              })
+                            }
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Assembly (+£{ASSEMBLY_PRICE_PER_ITEM})</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            value={editingBooking.serviceExtras?.assemblyItems ?? 0}
+                            onChange={(e) =>
+                              setEditingBooking({
+                                ...editingBooking,
+                                serviceExtras: {
+                                  ...(editingBooking.serviceExtras || emptyServiceExtras()),
+                                  assemblyItems: Math.max(0, parseInt(e.target.value, 10) || 0),
+                                },
+                              })
+                            }
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Packing boxes (+£{PACKING_PRICE_PER_5_BOXES}/5)</Label>
+                          <Select
+                            value={String(editingBooking.serviceExtras?.packingBoxes ?? 0)}
+                            onValueChange={(value) =>
+                              setEditingBooking({
+                                ...editingBooking,
+                                serviceExtras: {
+                                  ...(editingBooking.serviceExtras || emptyServiceExtras()),
+                                  packingBoxes: parseInt(value, 10) || 0,
+                                },
+                              })
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {PACKING_BOX_OPTIONS.map((n) => (
+                                <SelectItem key={n} value={String(n)}>
+                                  {n} boxes
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Suggested extras:{' '}
+                        {formatCurrency(
+                          suggestedExtrasTotal(editingBooking.serviceExtras || emptyServiceExtras())
+                        )}
+                      </p>
                     </div>
                   </div>
                   <div>
@@ -1805,6 +2196,127 @@ const BookingsPage = () => {
                       </div>
                     )}
                   </div>
+                </SectionShell>
+
+                <SectionShell title="Intermediate stops" icon={<MapPin className="h-4 w-4 text-muted-foreground" />}>
+                  <div className="flex justify-end mb-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={(editingBooking.stops || []).length >= 3}
+                      onClick={() =>
+                        setEditingBooking({
+                          ...editingBooking,
+                          stops: [...(editingBooking.stops || []), emptyStop()],
+                        })
+                      }
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add stop
+                    </Button>
+                  </div>
+                  {(editingBooking.stops || []).length === 0 && (
+                    <p className="text-sm text-muted-foreground">No intermediate stops</p>
+                  )}
+                  {(editingBooking.stops || []).map((stop: BookingStopForm, index: number) => (
+                    <div key={index} className="space-y-3 rounded-md border bg-background p-3 mb-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium">Stop {index + 1}</p>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            setEditingBooking({
+                              ...editingBooking,
+                              stops: (editingBooking.stops || []).filter(
+                                (_: BookingStopForm, i: number) => i !== index
+                              ),
+                            })
+                          }
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                      <div>
+                        <Label>Address</Label>
+                        <Input
+                          value={stop.address}
+                          onChange={(e) => {
+                            const stops = [...(editingBooking.stops || [])]
+                            stops[index] = { ...stops[index], address: e.target.value }
+                            setEditingBooking({ ...editingBooking, stops })
+                          }}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label>City</Label>
+                          <Input
+                            value={stop.city}
+                            onChange={(e) => {
+                              const stops = [...(editingBooking.stops || [])]
+                              stops[index] = { ...stops[index], city: e.target.value }
+                              setEditingBooking({ ...editingBooking, stops })
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <Label>Postcode</Label>
+                          <Input
+                            value={stop.zipCode}
+                            onChange={(e) => {
+                              const stops = [...(editingBooking.stops || [])]
+                              stops[index] = { ...stops[index], zipCode: e.target.value }
+                              setEditingBooking({ ...editingBooking, stops })
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label>Access</Label>
+                          <Select
+                            value={stop.access}
+                            onValueChange={(value: AccessType) => {
+                              const stops = [...(editingBooking.stops || [])]
+                              stops[index] = { ...stops[index], access: value }
+                              setEditingBooking({ ...editingBooking, stops })
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="ground">Ground floor</SelectItem>
+                              <SelectItem value="lift">Lift</SelectItem>
+                              <SelectItem value="stairs">Stairs</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {stop.access === 'stairs' && (
+                          <div>
+                            <Label>Stairs (flights)</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={50}
+                              value={stop.stairsCount}
+                              onChange={(e) => {
+                                const stops = [...(editingBooking.stops || [])]
+                                stops[index] = {
+                                  ...stops[index],
+                                  stairsCount: parseInt(e.target.value, 10) || 1,
+                                }
+                                setEditingBooking({ ...editingBooking, stops })
+                              }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </SectionShell>
 
                 <SectionShell title="Drop-off details" icon={<MapPin className="h-4 w-4 text-muted-foreground" />}>
