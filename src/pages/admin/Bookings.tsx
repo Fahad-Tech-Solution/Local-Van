@@ -29,8 +29,6 @@ import {
   totalVans,
   vanCountsFromBooking,
   type BookingStopForm,
-  type ServiceExtrasForm,
-  type VanCounts,
 } from '@/utils/manualBookingExtras'
 import { 
   useAdminBookings, 
