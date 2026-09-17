@@ -1013,345 +1013,390 @@ const BookingsPage = () => {
 
         {/* Create Manual Order Dialog */}
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Add Manual Order</DialogTitle>
               <DialogDescription>
-                Create a booking for customers who booked by phone and paid directly to the business
+                Create a booking across general, pickup, stops, and drop-off details
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Customer Name</Label>
-                  <Input
-                    value={newManualOrder.customer.name}
-                    onChange={(e) =>
-                      setNewManualOrder({
-                        ...newManualOrder,
-                        customer: { ...newManualOrder.customer, name: e.target.value },
-                      })
-                    }
-                  />
-                </div>
-                <div>
-                  <Label>Customer Phone</Label>
-                  <Input
-                    value={newManualOrder.customer.phone}
-                    onChange={(e) =>
-                      setNewManualOrder({
-                        ...newManualOrder,
-                        customer: { ...newManualOrder.customer, phone: e.target.value },
-                      })
-                    }
-                  />
-                </div>
-              </div>
-              <div>
-                <Label>Customer Email</Label>
-                <Input
-                  type="email"
-                  value={newManualOrder.customer.email}
-                  onChange={(e) =>
-                    setNewManualOrder({
-                      ...newManualOrder,
-                      customer: { ...newManualOrder.customer, email: e.target.value },
-                    })
-                  }
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Order Status</Label>
-                  <Select
-                    value={newManualOrder.status}
-                    onValueChange={(value: 'pending' | 'survey') =>
-                      setNewManualOrder({ ...newManualOrder, status: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="survey">Survey</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Payment Status</Label>
-                  <Select
-                    value={newManualOrder.paymentStatus}
-                    onValueChange={(value: 'paid' | 'pending') =>
-                      setNewManualOrder({ ...newManualOrder, paymentStatus: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="paid">Paid</SelectItem>
-                      <SelectItem value="pending">Pending</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div>
-                <Label>Price (£)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={newManualOrder.price || ''}
-                  onChange={(e) =>
-                    setNewManualOrder({
-                      ...newManualOrder,
-                      price: parseFloat(e.target.value) || 0,
-                    })
-                  }
-                />
-              </div>
-              {newManualOrder.paymentStatus === 'paid' && (
-                <div className="grid grid-cols-2 gap-4">
+              <SectionShell title="General details" icon={<Package className="h-4 w-4 text-muted-foreground" />}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <Label>Payment Method</Label>
+                    <Label>Order status</Label>
                     <Select
-                      value={newManualOrder.paymentMethod}
-                      onValueChange={(value: 'bank-transfer' | 'cash' | 'card' | 'other') =>
-                        setNewManualOrder({ ...newManualOrder, paymentMethod: value })
+                      value={newManualOrder.status}
+                      onValueChange={(value: 'pending' | 'survey') =>
+                        setNewManualOrder({ ...newManualOrder, status: value })
                       }
                     >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="bank-transfer">Bank Transfer</SelectItem>
-                        <SelectItem value="cash">Cash</SelectItem>
-                        <SelectItem value="card">Card</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="survey">Survey</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
-                    <Label>Payment Reference (optional)</Label>
+                    <Label>Price (£)</Label>
                     <Input
-                      placeholder="Bank ref, receipt no..."
-                      value={newManualOrder.paymentReference}
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={newManualOrder.price || ''}
                       onChange={(e) =>
-                        setNewManualOrder({ ...newManualOrder, paymentReference: e.target.value })
+                        setNewManualOrder({
+                          ...newManualOrder,
+                          price: parseFloat(e.target.value) || 0,
+                        })
                       }
                     />
                   </div>
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Service Type</Label>
-                  <Select
-                    value={newManualOrder.serviceType}
-                    onValueChange={(value: 'local' | 'long-distance' | 'interstate') =>
-                      setNewManualOrder({ ...newManualOrder, serviceType: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="local">Local</SelectItem>
-                      <SelectItem value="long-distance">Long Distance</SelectItem>
-                      <SelectItem value="interstate">Interstate</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="space-y-2 rounded-lg border p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <Label>Vans by size</Label>
-                  <span className="text-xs text-muted-foreground">
-                    Total: {totalVans(newManualOrder.vanCounts)}
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {VAN_SIZE_FIELDS.map((field) => (
-                    <div key={field.key}>
-                      <Label className="text-xs">{field.label}</Label>
-                      <Input
-                        type="number"
-                        min={0}
-                        max={20}
-                        value={newManualOrder.vanCounts[field.key]}
-                        onChange={(e) =>
-                          setNewManualOrder({
-                            ...newManualOrder,
-                            vanCounts: {
-                              ...newManualOrder.vanCounts,
-                              [field.key]: Math.max(0, parseInt(e.target.value, 10) || 0),
-                            },
-                          })
-                        }
-                      />
+                  <div>
+                    <Label>Customer name</Label>
+                    <Input
+                      value={newManualOrder.customer.name}
+                      onChange={(e) =>
+                        setNewManualOrder({
+                          ...newManualOrder,
+                          customer: { ...newManualOrder.customer, name: e.target.value },
+                        })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>Customer email</Label>
+                    <Input
+                      type="email"
+                      value={newManualOrder.customer.email}
+                      onChange={(e) =>
+                        setNewManualOrder({
+                          ...newManualOrder,
+                          customer: { ...newManualOrder.customer, email: e.target.value },
+                        })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>Customer phone</Label>
+                    <Input
+                      value={newManualOrder.customer.phone}
+                      onChange={(e) =>
+                        setNewManualOrder({
+                          ...newManualOrder,
+                          customer: { ...newManualOrder.customer, phone: e.target.value },
+                        })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>Payment status</Label>
+                    <Select
+                      value={newManualOrder.paymentStatus}
+                      onValueChange={(value: 'paid' | 'pending') =>
+                        setNewManualOrder({ ...newManualOrder, paymentStatus: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="paid">Paid</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {newManualOrder.paymentStatus === 'paid' && (
+                    <>
+                      <div>
+                        <Label>Payment method</Label>
+                        <Select
+                          value={newManualOrder.paymentMethod}
+                          onValueChange={(value: 'bank-transfer' | 'cash' | 'card' | 'other') =>
+                            setNewManualOrder({ ...newManualOrder, paymentMethod: value })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="bank-transfer">Bank Transfer</SelectItem>
+                            <SelectItem value="cash">Cash</SelectItem>
+                            <SelectItem value="card">Card</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Payment reference</Label>
+                        <Input
+                          placeholder="Bank ref, receipt no..."
+                          value={newManualOrder.paymentReference}
+                          onChange={(e) =>
+                            setNewManualOrder({
+                              ...newManualOrder,
+                              paymentReference: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                    </>
+                  )}
+                  <div>
+                    <Label>Service type</Label>
+                    <Select
+                      value={newManualOrder.serviceType}
+                      onValueChange={(value: 'local' | 'long-distance' | 'interstate') =>
+                        setNewManualOrder({ ...newManualOrder, serviceType: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="local">Local</SelectItem>
+                        <SelectItem value="long-distance">Long Distance</SelectItem>
+                        <SelectItem value="interstate">Interstate</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="sm:col-span-2 space-y-2 rounded-lg border p-3">
+                    <div className="flex items-center justify-between">
+                      <Label>Vans by size</Label>
+                      <span className="text-xs text-muted-foreground">
+                        Total: {totalVans(newManualOrder.vanCounts)}
+                      </span>
                     </div>
-                  ))}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {VAN_SIZE_FIELDS.map((field) => (
+                        <div key={field.key}>
+                          <Label className="text-xs">{field.label}</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            max={20}
+                            value={newManualOrder.vanCounts[field.key]}
+                            onChange={(e) =>
+                              setNewManualOrder({
+                                ...newManualOrder,
+                                vanCounts: {
+                                  ...newManualOrder.vanCounts,
+                                  [field.key]: Math.max(0, parseInt(e.target.value, 10) || 0),
+                                },
+                              })
+                            }
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Drivers</Label>
+                    <Input value={totalVans(newManualOrder.vanCounts)} disabled readOnly />
+                    <p className="text-xs text-muted-foreground mt-1">Equals number of vans</p>
+                  </div>
+                  <div>
+                    <Label>Helpers</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={20}
+                      value={newManualOrder.helpers}
+                      onChange={(e) =>
+                        setNewManualOrder({
+                          ...newManualOrder,
+                          helpers: Math.max(0, parseInt(e.target.value, 10) || 0),
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="sm:col-span-2 space-y-2 rounded-lg border p-3">
+                    <Label>Extras (hint only — total price above stays manual)</Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <Label className="text-xs">Dismantle (+£{DISMANTLE_PRICE_PER_ITEM})</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={newManualOrder.serviceExtras.dismantleItems}
+                          onChange={(e) =>
+                            setNewManualOrder({
+                              ...newManualOrder,
+                              serviceExtras: {
+                                ...newManualOrder.serviceExtras,
+                                dismantleItems: Math.max(0, parseInt(e.target.value, 10) || 0),
+                              },
+                            })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Assembly (+£{ASSEMBLY_PRICE_PER_ITEM})</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={newManualOrder.serviceExtras.assemblyItems}
+                          onChange={(e) =>
+                            setNewManualOrder({
+                              ...newManualOrder,
+                              serviceExtras: {
+                                ...newManualOrder.serviceExtras,
+                                assemblyItems: Math.max(0, parseInt(e.target.value, 10) || 0),
+                              },
+                            })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Packing boxes (+£{PACKING_PRICE_PER_5_BOXES}/5)</Label>
+                        <Select
+                          value={String(newManualOrder.serviceExtras.packingBoxes)}
+                          onValueChange={(value) =>
+                            setNewManualOrder({
+                              ...newManualOrder,
+                              serviceExtras: {
+                                ...newManualOrder.serviceExtras,
+                                packingBoxes: parseInt(value, 10) || 0,
+                              },
+                            })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PACKING_BOX_OPTIONS.map((n) => (
+                              <SelectItem key={n} value={String(n)}>
+                                {n} boxes
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Suggested extras:{' '}
+                      {formatCurrency(suggestedExtrasTotal(newManualOrder.serviceExtras))}
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>Drivers</Label>
-                  <Input value={totalVans(newManualOrder.vanCounts)} disabled readOnly />
-                  <p className="text-xs text-muted-foreground mt-1">Equals number of vans</p>
-                </div>
-                <div>
-                  <Label>Helpers</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={20}
-                    value={newManualOrder.helpers}
+                  <Label>Special instructions</Label>
+                  <Textarea
+                    rows={3}
+                    value={newManualOrder.specialInstructions}
                     onChange={(e) =>
                       setNewManualOrder({
                         ...newManualOrder,
-                        helpers: Math.max(0, parseInt(e.target.value, 10) || 0),
+                        specialInstructions: e.target.value,
                       })
                     }
                   />
                 </div>
-              </div>
-              <div>
-                <Label>Pickup Address</Label>
-                <Input
-                  value={newManualOrder.pickupAddress}
-                  onChange={(e) =>
-                    setNewManualOrder({ ...newManualOrder, pickupAddress: e.target.value })
-                  }
-                />
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <Label>Pickup City</Label>
-                  <Input
-                    value={newManualOrder.pickupCity}
-                    onChange={(e) =>
-                      setNewManualOrder({ ...newManualOrder, pickupCity: e.target.value })
-                    }
-                  />
-                </div>
-                <div>
-                  <Label>Pickup Postcode</Label>
-                  <Input
-                    value={newManualOrder.pickupZipCode}
-                    onChange={(e) =>
-                      setNewManualOrder({ ...newManualOrder, pickupZipCode: e.target.value })
-                    }
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Pickup Access</Label>
-                  <Select
-                    value={newManualOrder.pickupAccess}
-                    onValueChange={(value: 'lift' | 'stairs' | 'ground') =>
-                      setNewManualOrder({ ...newManualOrder, pickupAccess: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ground">Ground floor</SelectItem>
-                      <SelectItem value="lift">Lift</SelectItem>
-                      <SelectItem value="stairs">Stairs</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {newManualOrder.pickupAccess === 'stairs' && (
-                  <div>
-                    <Label>Pickup Stairs (flights)</Label>
-                    <Input
-                      type="number"
-                      min="1"
-                      max="50"
-                      value={newManualOrder.pickupStairsCount}
-                      onChange={(e) =>
-                        setNewManualOrder({
-                          ...newManualOrder,
-                          pickupStairsCount: parseInt(e.target.value, 10) || 1,
-                        })
-                      }
-                    />
-                  </div>
-                )}
-              </div>
-              <div>
-                <Label>Delivery Address</Label>
-                <Input
-                  value={newManualOrder.deliveryAddress}
-                  onChange={(e) =>
-                    setNewManualOrder({ ...newManualOrder, deliveryAddress: e.target.value })
-                  }
-                />
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <Label>Delivery City</Label>
-                  <Input
-                    value={newManualOrder.deliveryCity}
-                    onChange={(e) =>
-                      setNewManualOrder({ ...newManualOrder, deliveryCity: e.target.value })
-                    }
-                  />
-                </div>
-                <div>
-                  <Label>Delivery Postcode</Label>
-                  <Input
-                    value={newManualOrder.deliveryZipCode}
-                    onChange={(e) =>
-                      setNewManualOrder({ ...newManualOrder, deliveryZipCode: e.target.value })
-                    }
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Delivery Access</Label>
-                  <Select
-                    value={newManualOrder.deliveryAccess}
-                    onValueChange={(value: 'lift' | 'stairs' | 'ground') =>
-                      setNewManualOrder({ ...newManualOrder, deliveryAccess: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ground">Ground floor</SelectItem>
-                      <SelectItem value="lift">Lift</SelectItem>
-                      <SelectItem value="stairs">Stairs</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {newManualOrder.deliveryAccess === 'stairs' && (
-                  <div>
-                    <Label>Delivery Stairs (flights)</Label>
-                    <Input
-                      type="number"
-                      min="1"
-                      max="50"
-                      value={newManualOrder.deliveryStairsCount}
-                      onChange={(e) =>
-                        setNewManualOrder({
-                          ...newManualOrder,
-                          deliveryStairsCount: parseInt(e.target.value, 10) || 1,
-                        })
-                      }
-                    />
-                  </div>
-                )}
-              </div>
+              </SectionShell>
 
-              <div className="space-y-3 rounded-lg border p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <Label>Intermediate stops (optional, max 3)</Label>
+              <SectionShell title="Pickup details" icon={<MapPin className="h-4 w-4 text-muted-foreground" />}>
+                <div>
+                  <Label>Pickup address</Label>
+                  <Input
+                    value={newManualOrder.pickupAddress}
+                    onChange={(e) =>
+                      setNewManualOrder({ ...newManualOrder, pickupAddress: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Pickup city</Label>
+                    <Input
+                      value={newManualOrder.pickupCity}
+                      onChange={(e) =>
+                        setNewManualOrder({ ...newManualOrder, pickupCity: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>Pickup postcode</Label>
+                    <Input
+                      value={newManualOrder.pickupZipCode}
+                      onChange={(e) =>
+                        setNewManualOrder({ ...newManualOrder, pickupZipCode: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>Pickup date</Label>
+                    <Input
+                      type="date"
+                      value={newManualOrder.pickupDate}
+                      onChange={(e) =>
+                        setNewManualOrder({ ...newManualOrder, pickupDate: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>Pickup time</Label>
+                    <Select
+                      value={newManualOrder.pickupTime || undefined}
+                      onValueChange={(value) =>
+                        setNewManualOrder({ ...newManualOrder, pickupTime: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select pickup time" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PICKUP_TIME_OPTIONS.map((slot) => (
+                          <SelectItem key={slot} value={slot}>
+                            {slot}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Pickup access</Label>
+                    <Select
+                      value={newManualOrder.pickupAccess}
+                      onValueChange={(value: AccessType) =>
+                        setNewManualOrder({ ...newManualOrder, pickupAccess: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ground">Ground floor</SelectItem>
+                        <SelectItem value="lift">Lift</SelectItem>
+                        <SelectItem value="stairs">Stairs</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {newManualOrder.pickupAccess === 'stairs' && (
+                    <div>
+                      <Label>Pickup stairs (flights)</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        max="50"
+                        value={newManualOrder.pickupStairsCount}
+                        onChange={(e) =>
+                          setNewManualOrder({
+                            ...newManualOrder,
+                            pickupStairsCount: parseInt(e.target.value, 10) || 1,
+                          })
+                        }
+                      />
+                    </div>
+                  )}
+                </div>
+              </SectionShell>
+
+              <SectionShell title="Intermediate stops" icon={<MapPin className="h-4 w-4 text-muted-foreground" />}>
+                <div className="flex justify-end mb-2">
                   <Button
                     type="button"
                     variant="outline"
@@ -1368,8 +1413,11 @@ const BookingsPage = () => {
                     Add stop
                   </Button>
                 </div>
+                {newManualOrder.stops.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No intermediate stops</p>
+                )}
                 {newManualOrder.stops.map((stop, index) => (
-                  <div key={index} className="space-y-3 rounded-md border bg-muted/20 p-3">
+                  <div key={index} className="space-y-3 rounded-md border bg-background p-3 mb-3">
                     <div className="flex items-center justify-between">
                       <p className="text-sm font-medium">Stop {index + 1}</p>
                       <Button
@@ -1426,7 +1474,7 @@ const BookingsPage = () => {
                         <Label>Access</Label>
                         <Select
                           value={stop.access}
-                          onValueChange={(value: 'lift' | 'stairs' | 'ground') => {
+                          onValueChange={(value: AccessType) => {
                             const stops = [...newManualOrder.stops]
                             stops[index] = { ...stops[index], access: value }
                             setNewManualOrder({ ...newManualOrder, stops })
@@ -1464,119 +1512,74 @@ const BookingsPage = () => {
                     </div>
                   </div>
                 ))}
-              </div>
+              </SectionShell>
 
-              <div className="space-y-3 rounded-lg border p-3">
-                <Label>Extras (line items — price is still entered manually below)</Label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <SectionShell title="Drop-off details" icon={<MapPin className="h-4 w-4 text-muted-foreground" />}>
+                <div>
+                  <Label>Delivery address</Label>
+                  <Input
+                    value={newManualOrder.deliveryAddress}
+                    onChange={(e) =>
+                      setNewManualOrder({ ...newManualOrder, deliveryAddress: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-xs">Dismantle items (+£{DISMANTLE_PRICE_PER_ITEM} each)</Label>
+                    <Label>Delivery city</Label>
                     <Input
-                      type="number"
-                      min={0}
-                      value={newManualOrder.serviceExtras.dismantleItems}
+                      value={newManualOrder.deliveryCity}
                       onChange={(e) =>
-                        setNewManualOrder({
-                          ...newManualOrder,
-                          serviceExtras: {
-                            ...newManualOrder.serviceExtras,
-                            dismantleItems: Math.max(0, parseInt(e.target.value, 10) || 0),
-                          },
-                        })
+                        setNewManualOrder({ ...newManualOrder, deliveryCity: e.target.value })
                       }
                     />
                   </div>
                   <div>
-                    <Label className="text-xs">Assembly items (+£{ASSEMBLY_PRICE_PER_ITEM} each)</Label>
+                    <Label>Delivery postcode</Label>
                     <Input
-                      type="number"
-                      min={0}
-                      value={newManualOrder.serviceExtras.assemblyItems}
+                      value={newManualOrder.deliveryZipCode}
                       onChange={(e) =>
-                        setNewManualOrder({
-                          ...newManualOrder,
-                          serviceExtras: {
-                            ...newManualOrder.serviceExtras,
-                            assemblyItems: Math.max(0, parseInt(e.target.value, 10) || 0),
-                          },
-                        })
+                        setNewManualOrder({ ...newManualOrder, deliveryZipCode: e.target.value })
                       }
                     />
                   </div>
                   <div>
-                    <Label className="text-xs">Packing boxes (+£{PACKING_PRICE_PER_5_BOXES} / 5)</Label>
+                    <Label>Delivery access</Label>
                     <Select
-                      value={String(newManualOrder.serviceExtras.packingBoxes)}
-                      onValueChange={(value) =>
-                        setNewManualOrder({
-                          ...newManualOrder,
-                          serviceExtras: {
-                            ...newManualOrder.serviceExtras,
-                            packingBoxes: parseInt(value, 10) || 0,
-                          },
-                        })
+                      value={newManualOrder.deliveryAccess}
+                      onValueChange={(value: AccessType) =>
+                        setNewManualOrder({ ...newManualOrder, deliveryAccess: value })
                       }
                     >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {PACKING_BOX_OPTIONS.map((n) => (
-                          <SelectItem key={n} value={String(n)}>
-                            {n} boxes
-                          </SelectItem>
-                        ))}
+                        <SelectItem value="ground">Ground floor</SelectItem>
+                        <SelectItem value="lift">Lift</SelectItem>
+                        <SelectItem value="stairs">Stairs</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
+                  {newManualOrder.deliveryAccess === 'stairs' && (
+                    <div>
+                      <Label>Delivery stairs (flights)</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        max="50"
+                        value={newManualOrder.deliveryStairsCount}
+                        onChange={(e) =>
+                          setNewManualOrder({
+                            ...newManualOrder,
+                            deliveryStairsCount: parseInt(e.target.value, 10) || 1,
+                          })
+                        }
+                      />
+                    </div>
+                  )}
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Suggested extras total: {formatCurrency(suggestedExtrasTotal(newManualOrder.serviceExtras))} (not auto-added)
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Pickup Date</Label>
-                  <Input
-                    type="date"
-                    value={newManualOrder.pickupDate}
-                    onChange={(e) =>
-                      setNewManualOrder({ ...newManualOrder, pickupDate: e.target.value })
-                    }
-                  />
-                </div>
-                <div>
-                  <Label>Pickup Time</Label>
-                  <Select
-                    value={newManualOrder.pickupTime}
-                    onValueChange={(value) =>
-                      setNewManualOrder({ ...newManualOrder, pickupTime: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select pickup time" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PICKUP_TIME_OPTIONS.map((slot) => (
-                        <SelectItem key={slot} value={slot}>
-                          {slot}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div>
-                <Label>Special Instructions (optional)</Label>
-                <Textarea
-                  value={newManualOrder.specialInstructions}
-                  onChange={(e) =>
-                    setNewManualOrder({ ...newManualOrder, specialInstructions: e.target.value })
-                  }
-                  rows={3}
-                />
-              </div>
+              </SectionShell>
             </div>
             <div className="sticky bottom-0 z-10 -mx-6 border-t bg-background px-6 pt-3 pb-1 space-y-3">
               <div className="flex items-start gap-2 rounded-lg border bg-muted/30 p-3">
