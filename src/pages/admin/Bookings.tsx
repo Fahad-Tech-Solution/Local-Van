@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useState, type ComponentProps, type ReactNode } from 'react'
 import DashboardLayout from '@/components/layouts/DashboardLayout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -72,6 +72,57 @@ const VAN_SIZE_FIELDS = [
 ]
 
 const PACKING_BOX_OPTIONS = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50]
+
+/** Allows wiping a 0 so the next digit replaces it (instead of typing 01). */
+function ClearableNumberInput({
+  value,
+  onValueChange,
+  min = 0,
+  max,
+  ...props
+}: Omit<ComponentProps<typeof Input>, 'value' | 'onChange' | 'type'> & {
+  value: number
+  onValueChange: (value: number) => void
+  min?: number
+  max?: number
+}) {
+  const [draft, setDraft] = useState<string | null>(null)
+  const clamp = (n: number) => {
+    let next = Math.max(min, n)
+    if (max != null) next = Math.min(max, next)
+    return next
+  }
+
+  return (
+    <Input
+      {...props}
+      type="number"
+      min={min}
+      max={max}
+      value={draft !== null ? draft : String(value)}
+      onFocus={(e) => {
+        setDraft(String(value))
+        props.onFocus?.(e)
+      }}
+      onChange={(e) => {
+        const raw = e.target.value
+        setDraft(raw)
+        if (raw === '') return
+        const n = parseInt(raw, 10)
+        if (!Number.isNaN(n)) onValueChange(clamp(n))
+      }}
+      onBlur={(e) => {
+        if (draft === null || draft === '' || Number.isNaN(parseInt(draft, 10))) {
+          onValueChange(min)
+        } else {
+          onValueChange(clamp(parseInt(draft, 10)))
+        }
+        setDraft(null)
+        props.onBlur?.(e)
+      }}
+    />
+  )
+}
 
 const VEHICLE_TYPE_OPTIONS = [
   { value: 'small', label: 'Small' },
@@ -1174,17 +1225,16 @@ const BookingsPage = () => {
                       {VAN_SIZE_FIELDS.map((field) => (
                         <div key={field.key}>
                           <Label className="text-xs">{field.label}</Label>
-                          <Input
-                            type="number"
+                          <ClearableNumberInput
                             min={0}
                             max={20}
                             value={newManualOrder.vanCounts[field.key]}
-                            onChange={(e) =>
+                            onValueChange={(n) =>
                               setNewManualOrder({
                                 ...newManualOrder,
                                 vanCounts: {
                                   ...newManualOrder.vanCounts,
-                                  [field.key]: Math.max(0, parseInt(e.target.value, 10) || 0),
+                                  [field.key]: n,
                                 },
                               })
                             }
@@ -1200,15 +1250,14 @@ const BookingsPage = () => {
                   </div>
                   <div>
                     <Label>Helpers</Label>
-                    <Input
-                      type="number"
+                    <ClearableNumberInput
                       min={0}
                       max={20}
                       value={newManualOrder.helpers}
-                      onChange={(e) =>
+                      onValueChange={(n) =>
                         setNewManualOrder({
                           ...newManualOrder,
-                          helpers: Math.max(0, parseInt(e.target.value, 10) || 0),
+                          helpers: n,
                         })
                       }
                     />
@@ -1218,16 +1267,15 @@ const BookingsPage = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div>
                         <Label className="text-xs">Dismantle (+£{DISMANTLE_PRICE_PER_ITEM})</Label>
-                        <Input
-                          type="number"
+                        <ClearableNumberInput
                           min={0}
                           value={newManualOrder.serviceExtras.dismantleItems}
-                          onChange={(e) =>
+                          onValueChange={(n) =>
                             setNewManualOrder({
                               ...newManualOrder,
                               serviceExtras: {
                                 ...newManualOrder.serviceExtras,
-                                dismantleItems: Math.max(0, parseInt(e.target.value, 10) || 0),
+                                dismantleItems: n,
                               },
                             })
                           }
@@ -1235,16 +1283,15 @@ const BookingsPage = () => {
                       </div>
                       <div>
                         <Label className="text-xs">Assembly (+£{ASSEMBLY_PRICE_PER_ITEM})</Label>
-                        <Input
-                          type="number"
+                        <ClearableNumberInput
                           min={0}
                           value={newManualOrder.serviceExtras.assemblyItems}
-                          onChange={(e) =>
+                          onValueChange={(n) =>
                             setNewManualOrder({
                               ...newManualOrder,
                               serviceExtras: {
                                 ...newManualOrder.serviceExtras,
-                                assemblyItems: Math.max(0, parseInt(e.target.value, 10) || 0),
+                                assemblyItems: n,
                               },
                             })
                           }
@@ -1963,15 +2010,14 @@ const BookingsPage = () => {
                         {VAN_SIZE_FIELDS.map((field) => (
                           <div key={field.key}>
                             <Label className="text-xs">{field.label}</Label>
-                            <Input
-                              type="number"
+                            <ClearableNumberInput
                               min={0}
                               max={20}
                               value={editingBooking.vanCounts?.[field.key] ?? 0}
-                              onChange={(e) => {
+                              onValueChange={(n) => {
                                 const vanCounts = {
                                   ...(editingBooking.vanCounts || emptyVanCounts()),
-                                  [field.key]: Math.max(0, parseInt(e.target.value, 10) || 0),
+                                  [field.key]: n,
                                 }
                                 setEditingBooking({
                                   ...editingBooking,
@@ -1994,15 +2040,14 @@ const BookingsPage = () => {
                     </div>
                     <div>
                       <Label>Helpers</Label>
-                      <Input
-                        type="number"
+                      <ClearableNumberInput
                         min={0}
                         max={20}
                         value={editingBooking.helpers ?? 0}
-                        onChange={(e) =>
+                        onValueChange={(n) =>
                           setEditingBooking({
                             ...editingBooking,
-                            helpers: Math.max(0, parseInt(e.target.value, 10) || 0),
+                            helpers: n,
                           })
                         }
                       />
@@ -2012,16 +2057,15 @@ const BookingsPage = () => {
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div>
                           <Label className="text-xs">Dismantle (+£{DISMANTLE_PRICE_PER_ITEM})</Label>
-                          <Input
-                            type="number"
+                          <ClearableNumberInput
                             min={0}
                             value={editingBooking.serviceExtras?.dismantleItems ?? 0}
-                            onChange={(e) =>
+                            onValueChange={(n) =>
                               setEditingBooking({
                                 ...editingBooking,
                                 serviceExtras: {
                                   ...(editingBooking.serviceExtras || emptyServiceExtras()),
-                                  dismantleItems: Math.max(0, parseInt(e.target.value, 10) || 0),
+                                  dismantleItems: n,
                                 },
                               })
                             }
@@ -2029,16 +2073,15 @@ const BookingsPage = () => {
                         </div>
                         <div>
                           <Label className="text-xs">Assembly (+£{ASSEMBLY_PRICE_PER_ITEM})</Label>
-                          <Input
-                            type="number"
+                          <ClearableNumberInput
                             min={0}
                             value={editingBooking.serviceExtras?.assemblyItems ?? 0}
-                            onChange={(e) =>
+                            onValueChange={(n) =>
                               setEditingBooking({
                                 ...editingBooking,
                                 serviceExtras: {
                                   ...(editingBooking.serviceExtras || emptyServiceExtras()),
-                                  assemblyItems: Math.max(0, parseInt(e.target.value, 10) || 0),
+                                  assemblyItems: n,
                                 },
                               })
                             }
