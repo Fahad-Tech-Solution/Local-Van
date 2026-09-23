@@ -44,12 +44,31 @@ export const useAuth = () => {
     },
   })
 
-  const logoutMutation = useMutation(authApi.logout, {
-    onSuccess: () => {
-      localStorage.removeItem('token')
-      queryClient.clear()
+  const logoutMutation = useMutation(
+    async () => {
+      // Server logout is a no-op for JWT; never block client sign-out on it.
+      try {
+        await authApi.logout()
+      } catch {
+        // ignore — local session is cleared in onSettled regardless
+      }
     },
-  })
+    {
+      onMutate: () => {
+        // Clear immediately so the first click always signs out (even if API is slow/down).
+        localStorage.removeItem('token')
+        queryClient.setQueryData('currentUser', null)
+      },
+      onSettled: () => {
+        localStorage.removeItem('token')
+        queryClient.clear()
+        const hashPath = window.location.hash.replace(/^#/, '') || '/'
+        if (!hashPath.startsWith('/login')) {
+          window.location.hash = '#/login'
+        }
+      },
+    }
+  )
 
   const updateProfileMutation = useMutation(authApi.updateProfile, {
     onSuccess: (data) => {

@@ -195,7 +195,7 @@ const SectionShell = ({
   icon?: ReactNode
   children: ReactNode
 }) => (
-  <section className="rounded-xl border bg-muted/30 p-4 sm:p-5 space-y-4">
+  <section className="rounded-xl border bg-white p-4 sm:p-5 space-y-4">
     <div className="flex items-center gap-2">
       {icon}
       <h4 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
@@ -1629,7 +1629,7 @@ const BookingsPage = () => {
               </SectionShell>
             </div>
             <div className="sticky bottom-0 z-10 -mx-6 border-t bg-background px-6 pt-3 pb-1 space-y-3">
-              <div className="flex items-start gap-2 rounded-lg border bg-muted/30 p-3">
+              <div className="flex items-start gap-2 rounded-lg border bg-white p-3">
                 <Checkbox
                   id="sendConfirmationEmail"
                   className="mt-0.5"
@@ -2433,7 +2433,7 @@ const BookingsPage = () => {
             )}
             <div className="sticky bottom-0 z-10 -mx-6 border-t bg-background px-6 pt-3 pb-1 space-y-3">
               {editingBooking && (
-                <div className="flex items-start gap-2 rounded-lg border bg-muted/30 p-3">
+                <div className="flex items-start gap-2 rounded-lg border bg-white p-3">
                   <Checkbox
                     id="editSendConfirmationEmail"
                     className="mt-0.5"

@@ -36,6 +36,13 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { CheckCircle2, XCircle } from 'lucide-react'
 
+const ROLE_TABS = [
+  { value: 'all', label: 'All' },
+  { value: 'customer', label: 'Customer' },
+  { value: 'driver', label: 'Driver' },
+  { value: 'admin', label: 'Admins' },
+] as const
+
 const UsersPage = () => {
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
@@ -224,8 +231,31 @@ const UsersPage = () => {
             <CardDescription>Search and filter users</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col gap-3 mb-4 md:flex-row md:gap-4">
-              <div className="flex-1 relative min-w-0 w-full">
+            <div className="mb-4 space-y-4">
+              <div className="flex p-1 rounded-full bg-form-field">
+                {ROLE_TABS.map((tab) => {
+                  const isActive = roleFilter === tab.value
+                  return (
+                    <button
+                      key={tab.value}
+                      type="button"
+                      onClick={() => {
+                        setRoleFilter(tab.value)
+                        setPage(1)
+                      }}
+                      className={`flex-1 rounded-full px-3 py-2 text-sm transition-colors ${
+                        isActive
+                          ? 'bg-white font-semibold text-foreground shadow-sm'
+                          : 'font-normal text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div className="relative w-full">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search by name or email..."
@@ -237,20 +267,6 @@ const UsersPage = () => {
                   className="pl-10"
                 />
               </div>
-              <Select value={roleFilter} onValueChange={(value) => {
-                setRoleFilter(value)
-                setPage(1)
-              }}>
-                <SelectTrigger className="w-full md:w-[180px]">
-                  <SelectValue placeholder="All Roles" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Roles</SelectItem>
-                  <SelectItem value="customer">Customers</SelectItem>
-                  <SelectItem value="driver">Drivers</SelectItem>
-                  <SelectItem value="admin">Admins</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
 
             {isLoading ? (
@@ -413,7 +429,7 @@ const UsersPage = () => {
             {editingUser && (
               <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-4 -mx-1 px-1">
                 {editingUser.role === 'customer' && editingUser.bookingStats && (
-                  <div className="rounded-lg border bg-muted/30 p-3 grid grid-cols-2 gap-3 text-sm">
+                  <div className="rounded-lg border bg-white p-3 grid grid-cols-2 gap-3 text-sm">
                     <div>
                       <p className="text-muted-foreground">Orders placed</p>
                       <p className="font-semibold text-lg">{editingUser.bookingStats.total}</p>

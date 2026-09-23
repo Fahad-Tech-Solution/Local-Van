@@ -54,6 +54,11 @@ const emptyForm: DriverApplicationData = {
   vehicleRegistrationDocument: '',
   vehiclePhoto: '',
   vehicleType: '',
+  vehicleTotalPayload: { value: undefined, unit: 'kg' },
+  vehicleLoadingCapacity: { value: undefined, unit: 'm³' },
+  vehicleMaxLength: { value: undefined, unit: 'm' },
+  vehicleMotorbikeCapacity: 0,
+  vehiclePayload: { value: undefined, unit: 'kg' },
   vehicleFuelType: 'petrol',
   vehicleTailLift: false,
   vehicleTrailer: false,
@@ -99,8 +104,22 @@ export default function DriverApplication() {
       }
     }
     if (targetStep === 2 || forSubmit) {
-      if (!form.vehicleRegistration || !form.vehicleCategory || !applicationFiles.vehiclePhoto) {
-        setError('Vehicle registration, category, and photo are required')
+      if (
+        !form.vehicleRegistration?.trim() ||
+        !form.vehicleCategory ||
+        !form.vehicleMake?.trim() ||
+        !form.vehicleModel?.trim() ||
+        !form.vehicleType ||
+        !form.vehicleBaseLocation?.trim() ||
+        form.vehicleTotalPayload?.value == null ||
+        form.vehicleLoadingCapacity?.value == null ||
+        !form.vehicleRegistrationDocumentType ||
+        !applicationFiles.vehicleRegistrationDocument ||
+        !applicationFiles.vehiclePhoto
+      ) {
+        setError(
+          'Please complete all required vehicle fields (registration, category, make, model, type, base location, payload, loading capacity, registration document, and photo)'
+        )
         return false
       }
     }
@@ -181,6 +200,37 @@ export default function DriverApplication() {
         ...form,
         ...uploaded,
         vehicleSeats: Number(form.vehicleSeats) || 1,
+        vehicleMotorbikeCapacity: Number(form.vehicleMotorbikeCapacity) || 0,
+        vehicleTailLift: Boolean(form.vehicleTailLift),
+        vehicleTrailer: Boolean(form.vehicleTrailer),
+        vehicleTotalPayload:
+          form.vehicleTotalPayload?.value != null
+            ? {
+                value: Number(form.vehicleTotalPayload.value),
+                unit: form.vehicleTotalPayload.unit || 'kg',
+              }
+            : undefined,
+        vehicleLoadingCapacity:
+          form.vehicleLoadingCapacity?.value != null
+            ? {
+                value: Number(form.vehicleLoadingCapacity.value),
+                unit: form.vehicleLoadingCapacity.unit || 'm³',
+              }
+            : undefined,
+        vehicleMaxLength:
+          form.vehicleMaxLength?.value != null
+            ? {
+                value: Number(form.vehicleMaxLength.value),
+                unit: form.vehicleMaxLength.unit || 'm',
+              }
+            : undefined,
+        vehiclePayload:
+          form.vehiclePayload?.value != null
+            ? {
+                value: Number(form.vehiclePayload.value),
+                unit: form.vehiclePayload.unit || 'kg',
+              }
+            : undefined,
       })
       setSubmitted(true)
     } catch (err: any) {
@@ -310,83 +360,414 @@ export default function DriverApplication() {
             )}
 
             {step === 2 && (
-              <>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <Label>Registration *</Label>
-                    <Input value={form.vehicleRegistration} onChange={(e) => update({ vehicleRegistration: e.target.value.toUpperCase() })} />
-                  </div>
-                  <div>
-                    <Label>Category *</Label>
-                    <Select value={form.vehicleCategory} onValueChange={(v: any) => update({ vehicleCategory: v })}>
-                      <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="small-van">Small Van</SelectItem>
-                        <SelectItem value="medium-van">Medium Van</SelectItem>
-                        <SelectItem value="large-van">Large Van</SelectItem>
-                        <SelectItem value="truck">Truck</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Make</Label>
-                    <Input value={form.vehicleMake} onChange={(e) => update({ vehicleMake: e.target.value })} />
-                  </div>
-                  <div>
-                    <Label>Model</Label>
-                    <Input value={form.vehicleModel} onChange={(e) => update({ vehicleModel: e.target.value })} />
-                  </div>
-                  <div>
-                    <Label>Vehicle type</Label>
-                    <Input value={form.vehicleType} onChange={(e) => update({ vehicleType: e.target.value })} placeholder="e.g. Luton van" />
-                  </div>
-                  <div>
-                    <Label>Base location</Label>
-                    <Input value={form.vehicleBaseLocation} onChange={(e) => update({ vehicleBaseLocation: e.target.value })} />
-                  </div>
-                  <div>
-                    <Label>Fuel type</Label>
-                    <Select value={form.vehicleFuelType} onValueChange={(v: any) => update({ vehicleFuelType: v })}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {['petrol', 'diesel', 'lpg', 'hybrid', 'electric'].map((f) => (
-                          <SelectItem key={f} value={f}>{f.charAt(0).toUpperCase() + f.slice(1)}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Registration document type</Label>
-                    <Select value={form.vehicleRegistrationDocumentType} onValueChange={(v: any) => update({ vehicleRegistrationDocumentType: v })}>
-                      <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="logbook">Logbook</SelectItem>
-                        <SelectItem value="mot">MOT</SelectItem>
-                        <SelectItem value="v5">V5</SelectItem>
-                      </SelectContent>
-                    </Select>
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+                    Basic details
+                  </h3>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <Label>Registration *</Label>
+                      <Input
+                        value={form.vehicleRegistration}
+                        onChange={(e) =>
+                          update({ vehicleRegistration: e.target.value.toUpperCase() })
+                        }
+                        placeholder="e.g., AB12 CDE"
+                        maxLength={8}
+                      />
+                    </div>
+                    <div>
+                      <Label>Category *</Label>
+                      <Select
+                        value={form.vehicleCategory}
+                        onValueChange={(v: any) => update({ vehicleCategory: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="small-van">Small Van</SelectItem>
+                          <SelectItem value="medium-van">Medium Van</SelectItem>
+                          <SelectItem value="large-van">Large Van</SelectItem>
+                          <SelectItem value="truck">Truck</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Make *</Label>
+                      <Input
+                        value={form.vehicleMake}
+                        onChange={(e) => update({ vehicleMake: e.target.value })}
+                        placeholder="e.g., Ford, Mercedes"
+                      />
+                    </div>
+                    <div>
+                      <Label>Model *</Label>
+                      <Input
+                        value={form.vehicleModel}
+                        onChange={(e) => update({ vehicleModel: e.target.value })}
+                        placeholder="e.g., Transit, Sprinter"
+                      />
+                    </div>
+                    <div>
+                      <Label>Type of vehicle *</Label>
+                      <Select
+                        value={form.vehicleType}
+                        onValueChange={(v) => update({ vehicleType: v })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="goods-vehicle">Goods Vehicle</SelectItem>
+                          <SelectItem value="passenger-vehicle">Passenger Vehicle</SelectItem>
+                          <SelectItem value="mixed-use">Mixed Use</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Seats (including driver)</Label>
+                      <Select
+                        value={String(form.vehicleSeats || 1)}
+                        onValueChange={(v) => update({ vehicleSeats: Number(v) })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 10 }, (_, i) => i + 1).map((num) => (
+                            <SelectItem key={num} value={String(num)}>
+                              {num}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label>Where is this vehicle based predominantly? *</Label>
+                      <Input
+                        value={form.vehicleBaseLocation}
+                        onChange={(e) => update({ vehicleBaseLocation: e.target.value })}
+                        placeholder="Enter a location"
+                      />
+                    </div>
                   </div>
                 </div>
-                {fileHint}
-                <LocalFilePicker label="Vehicle registration document" file={applicationFiles.vehicleRegistrationDocument} onChange={(f) => updateFile('vehicleRegistrationDocument', f)} />
-                <LocalFilePicker label="Vehicle photo *" file={applicationFiles.vehiclePhoto} onChange={(f) => updateFile('vehiclePhoto', f)} />
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <Label>Tail lift?</Label>
-                    <RadioGroup value={form.vehicleTailLift ? 'yes' : 'no'} onValueChange={(v) => update({ vehicleTailLift: v === 'yes' })} className="flex gap-4 mt-2">
-                      <div className="flex items-center gap-2"><RadioGroupItem value="yes" id="tail-yes" /><Label htmlFor="tail-yes">Yes</Label></div>
-                      <div className="flex items-center gap-2"><RadioGroupItem value="no" id="tail-no" /><Label htmlFor="tail-no">No</Label></div>
-                    </RadioGroup>
-                  </div>
-                  <div>
-                    <Label>Trailer?</Label>
-                    <RadioGroup value={form.vehicleTrailer ? 'yes' : 'no'} onValueChange={(v) => update({ vehicleTrailer: v === 'yes' })} className="flex gap-4 mt-2">
-                      <div className="flex items-center gap-2"><RadioGroupItem value="yes" id="trailer-yes" /><Label htmlFor="trailer-yes">Yes</Label></div>
-                      <div className="flex items-center gap-2"><RadioGroupItem value="no" id="trailer-no" /><Label htmlFor="trailer-no">No</Label></div>
-                    </RadioGroup>
+
+                <div>
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+                    Capacity & specifications
+                  </h3>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <Label>Total payload *</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="number"
+                          value={form.vehicleTotalPayload?.value ?? ''}
+                          onChange={(e) =>
+                            update({
+                              vehicleTotalPayload: {
+                                value:
+                                  e.target.value === ''
+                                    ? undefined
+                                    : Number(e.target.value),
+                                unit: form.vehicleTotalPayload?.unit || 'kg',
+                              },
+                            })
+                          }
+                          placeholder="0"
+                          className="flex-1"
+                        />
+                        <Select
+                          value={form.vehicleTotalPayload?.unit || 'kg'}
+                          onValueChange={(unit: any) =>
+                            update({
+                              vehicleTotalPayload: {
+                                value: form.vehicleTotalPayload?.value,
+                                unit,
+                              },
+                            })
+                          }
+                        >
+                          <SelectTrigger className="w-28">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="kg">kg</SelectItem>
+                            <SelectItem value="tonnes">tonnes</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div>
+                      <Label>Loading capacity *</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="number"
+                          value={form.vehicleLoadingCapacity?.value ?? ''}
+                          onChange={(e) =>
+                            update({
+                              vehicleLoadingCapacity: {
+                                value:
+                                  e.target.value === ''
+                                    ? undefined
+                                    : Number(e.target.value),
+                                unit: form.vehicleLoadingCapacity?.unit || 'm³',
+                              },
+                            })
+                          }
+                          placeholder="0"
+                          className="flex-1"
+                        />
+                        <Select
+                          value={form.vehicleLoadingCapacity?.unit || 'm³'}
+                          onValueChange={(unit: any) =>
+                            update({
+                              vehicleLoadingCapacity: {
+                                value: form.vehicleLoadingCapacity?.value,
+                                unit,
+                              },
+                            })
+                          }
+                        >
+                          <SelectTrigger className="w-28">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="m³">m³</SelectItem>
+                            <SelectItem value="ft³">ft³</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div>
+                      <Label>Max length</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="number"
+                          value={form.vehicleMaxLength?.value ?? ''}
+                          onChange={(e) =>
+                            update({
+                              vehicleMaxLength: {
+                                value:
+                                  e.target.value === ''
+                                    ? undefined
+                                    : Number(e.target.value),
+                                unit: form.vehicleMaxLength?.unit || 'm',
+                              },
+                            })
+                          }
+                          placeholder="0"
+                          className="flex-1"
+                        />
+                        <Select
+                          value={form.vehicleMaxLength?.unit || 'm'}
+                          onValueChange={(unit: any) =>
+                            update({
+                              vehicleMaxLength: {
+                                value: form.vehicleMaxLength?.value,
+                                unit,
+                              },
+                            })
+                          }
+                        >
+                          <SelectTrigger className="w-28">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="m">m</SelectItem>
+                            <SelectItem value="ft">ft</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div>
+                      <Label>Payload</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="number"
+                          value={form.vehiclePayload?.value ?? ''}
+                          onChange={(e) =>
+                            update({
+                              vehiclePayload: {
+                                value:
+                                  e.target.value === ''
+                                    ? undefined
+                                    : Number(e.target.value),
+                                unit: form.vehiclePayload?.unit || 'kg',
+                              },
+                            })
+                          }
+                          placeholder="0"
+                          className="flex-1"
+                        />
+                        <Select
+                          value={form.vehiclePayload?.unit || 'kg'}
+                          onValueChange={(unit: any) =>
+                            update({
+                              vehiclePayload: {
+                                value: form.vehiclePayload?.value,
+                                unit,
+                              },
+                            })
+                          }
+                        >
+                          <SelectTrigger className="w-28">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="kg">kg</SelectItem>
+                            <SelectItem value="tonnes">tonnes</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label>Can you carry motorbikes, and if so how many?</Label>
+                      <Select
+                        value={String(form.vehicleMotorbikeCapacity ?? 0)}
+                        onValueChange={(v) =>
+                          update({ vehicleMotorbikeCapacity: Number(v) })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="0">No</SelectItem>
+                          {Array.from({ length: 10 }, (_, i) => i + 1).map((num) => (
+                            <SelectItem key={num} value={String(num)}>
+                              {num}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="md:col-span-2">
+                      <Label>Fuel type *</Label>
+                      <RadioGroup
+                        value={form.vehicleFuelType || 'petrol'}
+                        onValueChange={(v: any) => update({ vehicleFuelType: v })}
+                        className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-2"
+                      >
+                        {(['petrol', 'diesel', 'lpg', 'hybrid', 'electric'] as const).map(
+                          (fuel) => (
+                            <div key={fuel} className="flex items-center gap-2">
+                              <RadioGroupItem value={fuel} id={`fuel-${fuel}`} />
+                              <Label
+                                htmlFor={`fuel-${fuel}`}
+                                className="cursor-pointer font-normal capitalize"
+                              >
+                                {fuel}
+                              </Label>
+                            </div>
+                          )
+                        )}
+                      </RadioGroup>
+                    </div>
                   </div>
                 </div>
-              </>
+
+                <div>
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+                    Equipment
+                  </h3>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div>
+                      <Label>Do you have a tail lift?</Label>
+                      <RadioGroup
+                        value={form.vehicleTailLift ? 'yes' : 'no'}
+                        onValueChange={(v) => update({ vehicleTailLift: v === 'yes' })}
+                        className="flex gap-4 mt-2"
+                      >
+                        <div className="flex items-center gap-2">
+                          <RadioGroupItem value="yes" id="tail-yes" />
+                          <Label htmlFor="tail-yes" className="font-normal">
+                            Yes
+                          </Label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <RadioGroupItem value="no" id="tail-no" />
+                          <Label htmlFor="tail-no" className="font-normal">
+                            No
+                          </Label>
+                        </div>
+                      </RadioGroup>
+                    </div>
+                    <div>
+                      <Label>Do you ever use a trailer to transport vehicles? *</Label>
+                      <RadioGroup
+                        value={form.vehicleTrailer ? 'yes' : 'no'}
+                        onValueChange={(v) => update({ vehicleTrailer: v === 'yes' })}
+                        className="flex gap-4 mt-2"
+                      >
+                        <div className="flex items-center gap-2">
+                          <RadioGroupItem value="yes" id="trailer-yes" />
+                          <Label htmlFor="trailer-yes" className="font-normal">
+                            Yes
+                          </Label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <RadioGroupItem value="no" id="trailer-no" />
+                          <Label htmlFor="trailer-no" className="font-normal">
+                            No
+                          </Label>
+                        </div>
+                      </RadioGroup>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3">
+                    Documents & photos
+                  </h3>
+                  <div className="space-y-4">
+                    <div>
+                      <Label>Registration document type *</Label>
+                      <RadioGroup
+                        value={form.vehicleRegistrationDocumentType || ''}
+                        onValueChange={(v: any) =>
+                          update({ vehicleRegistrationDocumentType: v })
+                        }
+                        className="flex flex-col sm:flex-row gap-3 mt-2"
+                      >
+                        <div className="flex items-center gap-2">
+                          <RadioGroupItem value="logbook" id="doc-logbook" />
+                          <Label htmlFor="doc-logbook" className="font-normal">
+                            Copy of log book
+                          </Label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <RadioGroupItem value="mot" id="doc-mot" />
+                          <Label htmlFor="doc-mot" className="font-normal">
+                            Copy of MOT
+                          </Label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <RadioGroupItem value="v5" id="doc-v5" />
+                          <Label htmlFor="doc-v5" className="font-normal">
+                            V5 Document
+                          </Label>
+                        </div>
+                      </RadioGroup>
+                    </div>
+                    {fileHint}
+                    <LocalFilePicker
+                      label="Vehicle registration document *"
+                      file={applicationFiles.vehicleRegistrationDocument}
+                      onChange={(f) => updateFile('vehicleRegistrationDocument', f)}
+                    />
+                    <LocalFilePicker
+                      label="Vehicle photo *"
+                      file={applicationFiles.vehiclePhoto}
+                      onChange={(f) => updateFile('vehiclePhoto', f)}
+                    />
+                  </div>
+                </div>
+              </div>
             )}
 
             {step === 3 && (

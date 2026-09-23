@@ -31,7 +31,7 @@ const DetailRow = ({ label, value }: { label: string; value?: ReactNode }) => (
 )
 
 const Section = ({ title, children }: { title: string; children: ReactNode }) => (
-  <section className="rounded-lg border bg-muted/20 p-3 sm:p-4 space-y-1">
+  <section className="rounded-lg border bg-white p-3 sm:p-4 space-y-1">
     <h4 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground mb-2">
       {title}
     </h4>

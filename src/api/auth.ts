@@ -33,6 +33,23 @@ export interface DriverApplicationData {
   vehicleRegistrationDocument?: string
   vehiclePhoto?: string
   vehicleType?: string
+  vehicleTotalPayload?: {
+    value?: number
+    unit?: 'kg' | 'tonnes'
+  }
+  vehicleLoadingCapacity?: {
+    value?: number
+    unit?: 'm³' | 'ft³'
+  }
+  vehicleMaxLength?: {
+    value?: number
+    unit?: 'm' | 'ft'
+  }
+  vehicleMotorbikeCapacity?: number
+  vehiclePayload?: {
+    value?: number
+    unit?: 'kg' | 'tonnes'
+  }
   vehicleFuelType?: 'petrol' | 'diesel' | 'lpg' | 'hybrid' | 'electric'
   vehicleTailLift?: boolean
   vehicleTrailer?: boolean

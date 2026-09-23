@@ -70,7 +70,7 @@ const Section = ({
   title: string
   children: ReactNode
 }) => (
-  <section className="rounded-lg border bg-muted/20 p-4 space-y-1">
+  <section className="rounded-lg border bg-white p-4 space-y-1">
     <h4 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground mb-2">
       {title}
     </h4>
@@ -232,10 +232,62 @@ const DriverApplicationsPage = () => {
                 />
                 <DetailRow label="Registration" value={selected.vehicleRegistration} />
                 <DetailRow label="Category" value={categoryLabel(selected.vehicleCategory)} />
-                <DetailRow label="Type" value={selected.vehicleType} />
+                <DetailRow
+                  label="Type"
+                  value={
+                    selected.vehicleType
+                      ? String(selected.vehicleType)
+                          .split('-')
+                          .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1))
+                          .join(' ')
+                      : undefined
+                  }
+                />
                 <DetailRow label="Fuel" value={selected.vehicleFuelType} />
                 <DetailRow label="Seats" value={selected.vehicleSeats} />
                 <DetailRow label="Base location" value={selected.vehicleBaseLocation} />
+                <DetailRow
+                  label="Total payload"
+                  value={
+                    selected.vehicleTotalPayload?.value != null
+                      ? `${selected.vehicleTotalPayload.value} ${selected.vehicleTotalPayload.unit || ''}`.trim()
+                      : undefined
+                  }
+                />
+                <DetailRow
+                  label="Loading capacity"
+                  value={
+                    selected.vehicleLoadingCapacity?.value != null
+                      ? `${selected.vehicleLoadingCapacity.value} ${selected.vehicleLoadingCapacity.unit || ''}`.trim()
+                      : undefined
+                  }
+                />
+                <DetailRow
+                  label="Max length"
+                  value={
+                    selected.vehicleMaxLength?.value != null
+                      ? `${selected.vehicleMaxLength.value} ${selected.vehicleMaxLength.unit || ''}`.trim()
+                      : undefined
+                  }
+                />
+                <DetailRow
+                  label="Payload"
+                  value={
+                    selected.vehiclePayload?.value != null
+                      ? `${selected.vehiclePayload.value} ${selected.vehiclePayload.unit || ''}`.trim()
+                      : undefined
+                  }
+                />
+                <DetailRow
+                  label="Motorbike capacity"
+                  value={
+                    selected.vehicleMotorbikeCapacity != null
+                      ? selected.vehicleMotorbikeCapacity === 0
+                        ? 'No'
+                        : selected.vehicleMotorbikeCapacity
+                      : undefined
+                  }
+                />
                 <DetailRow
                   label="Tail lift"
                   value={

@@ -23,6 +23,17 @@ export interface AdminStats {
     totalSpent: number
     pipeline?: number
   }
+  recentTransactions?: {
+    _id: string
+    orderCode?: string
+    customerName?: string
+    pickupCity?: string
+    deliveryCity?: string
+    serviceType?: string
+    amount: number
+    completedAt?: string
+    paymentStatus?: string
+  }[]
 }
 
 export interface AdminNotification {
@@ -85,8 +96,20 @@ export interface User {
   vehicleCategory?: string
   vehicleMake?: string
   vehicleModel?: string
+  vehicleSeats?: number
   vehiclePhoto?: string
   vehicleBaseLocation?: string
+  vehicleType?: string
+  vehicleFuelType?: string
+  vehicleRegistrationDocumentType?: string
+  vehicleRegistrationDocument?: string
+  vehicleTotalPayload?: { value?: number; unit?: string }
+  vehicleLoadingCapacity?: { value?: number; unit?: string }
+  vehicleMaxLength?: { value?: number; unit?: string }
+  vehiclePayload?: { value?: number; unit?: string }
+  vehicleMotorbikeCapacity?: number
+  vehicleTailLift?: boolean
+  vehicleTrailer?: boolean
   createdAt: string
   updatedAt: string
 }

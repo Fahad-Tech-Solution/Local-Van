@@ -11,6 +11,7 @@ export interface DriverStats {
   recentEarnings?: {
     _id: string
     orderCode?: string
+    customerName?: string
     pickupCity?: string
     deliveryCity?: string
     amount: number

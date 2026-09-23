@@ -3,18 +3,18 @@ import { useParams, useNavigate } from 'react-router-dom'
 import DashboardLayout from '@/components/layouts/DashboardLayout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import {
   MapPin,
-  Calendar,
-  Clock,
   Loader2,
   AlertCircle,
   CheckCircle,
   XCircle,
+  Package,
 } from 'lucide-react'
 import {
   useDriverJob,
@@ -27,7 +27,13 @@ import {
 import { useAuth } from '@/hooks/useAuth'
 import { getOfferForDriver } from '@/utils/driverOffers'
 import { formatCurrency, formatDate, formatDateTime } from '@/utils/format'
-import { formatStairsDisplay } from '@/utils/stairsAccess'
+import { formatStairsDisplay, formatAccessFromAdmin } from '@/utils/stairsAccess'
+import {
+  formatServiceExtrasLabel,
+  formatVanCountsLabel,
+} from '@/utils/manualBookingExtras'
+import { GoogleMapsLink } from '@/components/GoogleMapsLink'
+import { ReadField, SectionShell } from '@/components/booking/SectionShell'
 import {
   Dialog,
   DialogContent,
@@ -43,6 +49,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+
+const serviceLabel = (value?: string) => {
+  if (value === 'long-distance') return 'Long Distance'
+  if (value === 'interstate') return 'Interstate'
+  if (value === 'local') return 'Local'
+  return value || '—'
+}
+
+const vehicleLabel = (value?: string) =>
+  value?.split('-').map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(' ') || '—'
+
+const formatPeopleSplit = (drivers?: number, helpers?: number, men?: number) => {
+  if (drivers != null || helpers != null) {
+    const d = Number(drivers) || 0
+    const h = Number(helpers) || 0
+    return `${d} driver${d === 1 ? '' : 's'}${h > 0 ? ` + ${h} helper${h === 1 ? '' : 's'}` : ''} (${d + h} total)`
+  }
+  if (!men || men < 1) return '—'
+  return men === 1 ? '1 person' : `${men} people`
+}
 
 const JobDetailsPage = () => {
   const { id } = useParams<{ id: string }>()
@@ -138,317 +164,245 @@ const JobDetailsPage = () => {
   const canDispute =
     ['confirmed', 'in-progress', 'completed'].includes(job.status) && !job.isDisputed
   const offeredPrice = offer?.offeredPrice ?? job.finalPrice ?? job.estimatedPrice
-  const additionalInfo =
-    (job as any).specialInstructions ||
-    (job as any).helpersLabel ||
-    (job as any).durationRequired ||
-    (job as any).collectionStairs ||
-    (job as any).deliveryStairs
+  const j = job as any
 
   return (
     <DashboardLayout role="driver">
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-3xl font-bold tracking-tight">Job Details</h2>
-            <p className="text-muted-foreground">Order #{job.orderCode || job._id}</p>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              {job.orderCode && <Badge variant="outline">#{job.orderCode}</Badge>}
+              <StatusBadge status={job.status} />
+            </div>
           </div>
-          <StatusBadge status={job.status} className="text-lg px-4 py-2" />
+          <Button variant="outline" onClick={() => navigate('/driver/jobs')}>
+            Back to Jobs
+          </Button>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Customer Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <p>
-                <strong>Name:</strong>{' '}
-                {typeof job.customer === 'object' ? job.customer.name : 'Unknown'}
-              </p>
-              <p>
-                <strong>Email:</strong>{' '}
-                {typeof job.customer === 'object' ? job.customer.email : job.contactEmail}
-              </p>
-              <p>
-                <strong>Phone:</strong> {job.contactPhone}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Job Information</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span>
-                  <strong>Date:</strong> {formatDate(job.pickupDate)}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <span>
-                  <strong>Time:</strong> {job.pickupTime}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span>
-                  <strong>
-                    {canRespondToOffer ? 'Offered Pay:' : 'Price:'}
-                  </strong>{' '}
-                  {formatCurrency(offeredPrice)}
-                </span>
-              </div>
-              {(job as any).additionalWorkPayment ? (
-                <div className="rounded-md border bg-muted/40 p-3 text-sm">
-                  <p>
-                    <strong>Additional:</strong>{' '}
-                    {formatCurrency((job as any).additionalWorkPayment)}
-                  </p>
-                  {(job as any).additionalWorkDescription ? (
-                    <p className="text-muted-foreground mt-1">
-                      {(job as any).additionalWorkDescription}
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
-              {canRespondToOffer && offer?.offeredPrice != null && (
-                <p className="text-xs text-muted-foreground">
-                  Admin offer (percentage of booking) — not customer list price
-                </p>
+        <div className="space-y-5">
+          <SectionShell title="General details" icon={<Package className="h-4 w-4 text-muted-foreground" />}>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <ReadField
+                label="Customer"
+                value={typeof job.customer === 'object' ? job.customer.name : 'Unknown'}
+              />
+              <ReadField
+                label="Email"
+                value={
+                  typeof job.customer === 'object' ? job.customer.email : job.contactEmail
+                }
+              />
+              <ReadField label="Phone" value={job.contactPhone} />
+              <ReadField label="Service type" value={serviceLabel(j.serviceType)} />
+              <ReadField
+                label="Vehicle / vans"
+                value={
+                  formatVanCountsLabel(j.vanCounts) !== '—'
+                    ? formatVanCountsLabel(j.vanCounts)
+                    : vehicleLabel(j.vehicleType)
+                }
+              />
+              <ReadField
+                label="People"
+                value={formatPeopleSplit(j.drivers, j.helpers, j.men)}
+              />
+              <ReadField label="Extras" value={formatServiceExtrasLabel(j.serviceExtras)} />
+              <ReadField
+                label={canRespondToOffer ? 'Offered pay' : 'Price'}
+                value={formatCurrency(offeredPrice)}
+              />
+              {j.durationRequired && (
+                <ReadField label="Duration" value={j.durationRequired} />
               )}
+              {j.miles != null && <ReadField label="Miles" value={j.miles} />}
               {job.offerExpiresAt && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Clock className="h-4 w-4" />
-                  <span>
-                    Offer expires: {formatDateTime(job.offerExpiresAt)}
-                  </span>
-                </div>
+                <ReadField
+                  label="Offer expires"
+                  value={formatDateTime(job.offerExpiresAt)}
+                />
               )}
-              {(job as any).serviceType && (
-                <p>
-                  <strong>Service:</strong>{' '}
-                  <span className="capitalize">{(job as any).serviceType}</span>
-                </p>
-              )}
-              {(job as any).vehicleType && (
-                <p>
-                  <strong>Vehicle:</strong>{' '}
-                  <span className="capitalize">
-                    {String((job as any).vehicleType).replace('-', ' ')}
-                  </span>
-                </p>
-              )}
-              {(job as any).miles != null && (
-                <p>
-                  <strong>Miles:</strong> {(job as any).miles}
-                </p>
-              )}
-              {(job as any).durationRequired && (
-                <p>
-                  <strong>Duration:</strong> {(job as any).durationRequired}
-                </p>
-              )}
-              {(job as any).helpersLabel || (job as any).manRequired ? (
-                <p>
-                  <strong>Helpers:</strong>{' '}
-                  {(job as any).helpersLabel || (job as any).manRequired}
-                </p>
-              ) : null}
-              {(job as any).collectionStairs && (
-                <p>
-                  <strong>Collection access:</strong>{' '}
-                  {formatStairsDisplay((job as any).collectionStairs)}
-                </p>
-              )}
-              {(job as any).deliveryStairs && (
-                <p>
-                  <strong>Delivery access:</strong>{' '}
-                  {formatStairsDisplay((job as any).deliveryStairs)}
-                </p>
-              )}
-              {additionalInfo && (
-                <div className="pt-2 border-t">
-                  <p className="font-medium">Additional Info</p>
-                  <p className="text-sm text-muted-foreground">
-                    {(job as any).specialInstructions ||
-                      [
-                        (job as any).helpersLabel,
-                        (job as any).durationRequired,
-                        (job as any).collectionStairs
-                          ? `Collection access: ${formatStairsDisplay((job as any).collectionStairs)}`
-                          : null,
-                        (job as any).deliveryStairs
-                          ? `Delivery access: ${formatStairsDisplay((job as any).deliveryStairs)}`
-                          : null,
-                      ]
-                        .filter(Boolean)
-                        .join(' · ') ||
-                      '—'}
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Pickup Location</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-start gap-2">
-                <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
-                <div>
-                  <p>{job.pickupAddress}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {job.pickupCity} {job.pickupZipCode}
-                  </p>
-                </div>
+              <ReadField label="Special instructions" value={j.specialInstructions} />
+            </div>
+            {j.additionalWorkPayment ? (
+              <div className="grid gap-4 sm:grid-cols-2 rounded-lg border bg-white p-3">
+                <ReadField
+                  label="Additional work"
+                  value={formatCurrency(j.additionalWorkPayment)}
+                />
+                <ReadField
+                  label="Additional work notes"
+                  value={j.additionalWorkDescription}
+                />
               </div>
-            </CardContent>
-          </Card>
+            ) : null}
+            {canRespondToOffer && offer?.offeredPrice != null && (
+              <p className="text-xs text-muted-foreground">
+                Admin offer (percentage of booking) — not customer list price
+              </p>
+            )}
+          </SectionShell>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Delivery Location</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-start gap-2">
-                <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
-                <div>
-                  <p>{job.deliveryAddress}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {job.deliveryCity} {job.deliveryZipCode}
-                  </p>
-                </div>
+          <SectionShell title="Pickup details" icon={<MapPin className="h-4 w-4 text-muted-foreground" />}>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <ReadField label="Address" value={job.pickupAddress} />
+              <ReadField label="City" value={job.pickupCity} />
+              <ReadField label="Postcode" value={job.pickupZipCode} />
+              <ReadField label="Date" value={formatDate(job.pickupDate)} />
+              <ReadField label="Time" value={job.pickupTime} />
+              <ReadField label="Access" value={formatStairsDisplay(j.collectionStairs)} />
+            </div>
+            <GoogleMapsLink
+              address={job.pickupAddress}
+              city={job.pickupCity}
+              zipCode={job.pickupZipCode}
+            />
+          </SectionShell>
+
+          {Array.isArray(j.stops) && j.stops.length > 0 && (
+            <SectionShell
+              title="Intermediate stops"
+              icon={<MapPin className="h-4 w-4 text-muted-foreground" />}
+            >
+              <div className="space-y-4">
+                {j.stops.map((stop: any, index: number) => (
+                  <div
+                    key={index}
+                    className="rounded-lg border bg-white p-3 space-y-3"
+                  >
+                    <p className="text-sm font-medium">Stop {index + 1}</p>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <ReadField label="Address" value={stop.address} />
+                      <ReadField label="City" value={stop.city} />
+                      <ReadField label="Postcode" value={stop.zipCode} />
+                      <ReadField
+                        label="Access"
+                        value={
+                          formatAccessFromAdmin(stop.access, stop.stairsCount) ||
+                          stop.access ||
+                          '—'
+                        }
+                      />
+                    </div>
+                    <GoogleMapsLink
+                      address={stop.address}
+                      city={stop.city}
+                      zipCode={stop.zipCode}
+                      label="Open stop in Google Maps"
+                    />
+                  </div>
+                ))}
               </div>
-            </CardContent>
-          </Card>
-        </div>
+            </SectionShell>
+          )}
 
-        {(job as any).specialInstructions && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Additional Info</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">{(job as any).specialInstructions}</p>
-            </CardContent>
-          </Card>
-        )}
+          <SectionShell
+            title="Drop-off details"
+            icon={<MapPin className="h-4 w-4 text-muted-foreground" />}
+          >
+            <div className="grid gap-4 sm:grid-cols-2">
+              <ReadField label="Address" value={job.deliveryAddress} />
+              <ReadField label="City" value={job.deliveryCity} />
+              <ReadField label="Postcode" value={job.deliveryZipCode} />
+              <ReadField label="Access" value={formatStairsDisplay(j.deliveryStairs)} />
+            </div>
+            <GoogleMapsLink
+              address={job.deliveryAddress}
+              city={job.deliveryCity}
+              zipCode={job.deliveryZipCode}
+            />
+          </SectionShell>
 
-        {job.completionPictures && job.completionPictures.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Completion Pictures</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-3 gap-4">
+          {job.completionPictures && job.completionPictures.length > 0 && (
+            <SectionShell title="Completion pictures">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 {job.completionPictures.map((pic: string, index: number) => (
                   <img
                     key={index}
                     src={pic}
                     alt={`Completion ${index + 1}`}
-                    className="w-full h-32 object-cover rounded"
+                    className="w-full h-32 object-cover rounded-lg border"
                   />
                 ))}
               </div>
-            </CardContent>
-          </Card>
-        )}
+            </SectionShell>
+          )}
 
-        {job.driverNotes && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Driver Notes</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p>{job.driverNotes}</p>
-            </CardContent>
-          </Card>
-        )}
+          {job.driverNotes && (
+            <SectionShell title="Driver notes">
+              <p className="text-sm">{job.driverNotes}</p>
+            </SectionShell>
+          )}
 
-        {job.isDisputed && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-destructive">
-                <AlertCircle className="h-5 w-5" />
-                Disputed
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p>
-                <strong>Reason:</strong> {job.disputeReason}
-              </p>
-              <p className="text-sm text-muted-foreground mt-2">
-                Status: {job.disputeResolved ? 'Resolved' : 'Pending Resolution'}
-              </p>
-            </CardContent>
-          </Card>
-        )}
+          {job.isDisputed && (
+            <SectionShell title="Dispute">
+              <div className="flex items-start gap-2 text-destructive">
+                <AlertCircle className="h-4 w-4 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium">Reason: {job.disputeReason}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Status: {job.disputeResolved ? 'Resolved' : 'Pending resolution'}
+                  </p>
+                </div>
+              </div>
+            </SectionShell>
+          )}
 
-        {isOfferExpired && ['pending', 'offered'].includes(job.status) && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-destructive">
-                <AlertCircle className="h-5 w-5" />
-                Offer Expired
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground">
+          {isOfferExpired && ['pending', 'offered'].includes(job.status) && (
+            <SectionShell title="Offer expired">
+              <p className="text-sm text-muted-foreground">
                 This job offer has expired and can no longer be accepted or rejected.
               </p>
+            </SectionShell>
+          )}
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Actions</CardTitle>
+            </CardHeader>
+            <CardContent className="flex gap-2 flex-wrap">
+              {canRespondToOffer && (
+                <>
+                  <Button
+                    onClick={handleAcceptOffer}
+                    disabled={acceptMutation.isLoading || rejectMutation.isLoading}
+                    className="flex-1 min-w-[140px]"
+                  >
+                    <CheckCircle className="mr-2 h-4 w-4" />
+                    Accept Offer ({formatCurrency(offeredPrice)})
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleRejectOffer}
+                    disabled={acceptMutation.isLoading || rejectMutation.isLoading}
+                    className="flex-1 min-w-[140px]"
+                  >
+                    <XCircle className="mr-2 h-4 w-4" />
+                    Reject
+                  </Button>
+                </>
+              )}
+              {canUpdateStatus && (
+                <Button onClick={() => setIsStatusDialogOpen(true)}>Update Status</Button>
+              )}
+              {canComplete && (
+                <Button variant="outline" onClick={() => setIsCompleteDialogOpen(true)}>
+                  Complete Job
+                </Button>
+              )}
+              {canDispute && (
+                <Button variant="destructive" onClick={() => setIsDisputeDialogOpen(true)}>
+                  Dispute Job
+                </Button>
+              )}
+              {!canRespondToOffer && !canUpdateStatus && !canComplete && !canDispute && (
+                <p className="text-sm text-muted-foreground">No actions available for this job.</p>
+              )}
             </CardContent>
           </Card>
-        )}
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Actions</CardTitle>
-          </CardHeader>
-          <CardContent className="flex gap-2 flex-wrap">
-            {canRespondToOffer && (
-              <>
-                <Button
-                  onClick={handleAcceptOffer}
-                  disabled={acceptMutation.isLoading || rejectMutation.isLoading}
-                  className="flex-1 min-w-[140px]"
-                >
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                  Accept Offer ({formatCurrency(offeredPrice)})
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleRejectOffer}
-                  disabled={acceptMutation.isLoading || rejectMutation.isLoading}
-                  className="flex-1 min-w-[140px]"
-                >
-                  <XCircle className="mr-2 h-4 w-4" />
-                  Reject
-                </Button>
-              </>
-            )}
-            {canUpdateStatus && (
-              <Button onClick={() => setIsStatusDialogOpen(true)}>Update Status</Button>
-            )}
-            {canComplete && (
-              <Button variant="outline" onClick={() => setIsCompleteDialogOpen(true)}>
-                Complete Job
-              </Button>
-            )}
-            {canDispute && (
-              <Button variant="destructive" onClick={() => setIsDisputeDialogOpen(true)}>
-                Dispute Job
-              </Button>
-            )}
-            {!canRespondToOffer && !canUpdateStatus && !canComplete && !canDispute && (
-              <p className="text-sm text-muted-foreground">No actions available for this job.</p>
-            )}
-          </CardContent>
-        </Card>
+        </div>
 
         <Dialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
           <DialogContent>
