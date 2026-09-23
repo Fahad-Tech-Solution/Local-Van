@@ -38,7 +38,7 @@ export interface AdminStats {
 
 export interface AdminNotification {
   _id: string
-  type: 'offer_accepted' | 'offer_rejected' | 'driver_application' | 'general'
+  type: 'offer_accepted' | 'offer_rejected' | 'driver_application' | 'job_cancelled_by_driver' | 'general'
   title: string
   message: string
   booking?: string | Booking
@@ -118,7 +118,7 @@ export interface Booking {
   _id: string
   customer: User | string
   driver?: User | string
-  status: 'pending' | 'offered' | 'confirmed' | 'in-progress' | 'completed' | 'cancelled' | 'disputed' | 'survey'
+  status: 'pending' | 'offered' | 'confirmed' | 'in-progress' | 'job-started' | 'completed' | 'cancelled' | 'disputed' | 'survey'
   pickupAddress: string
   pickupCity: string
   pickupState?: string
@@ -172,6 +172,8 @@ export interface Booking {
   contactEmail?: string
   contactPhone?: string
   completionPictures?: string[]
+  pickupPhotos?: string[]
+  dropoffPhotos?: string[]
   driverNotes?: string
   additionalWorkPayment?: number
   additionalWorkDescription?: string

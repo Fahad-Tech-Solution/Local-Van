@@ -83,6 +83,104 @@ export function formatServiceExtrasLabel(extras?: Partial<ServiceExtrasForm> | n
   return parts.length ? parts.join('; ') : 'None'
 }
 
+/** People line for driver/admin read views — prefers website helpersLabel when present. */
+export function formatBookingPeopleLabel(booking: any): string {
+  if (!booking) return '—'
+  const { drivers, helpers } = getBookingDriversAndHelpers(booking)
+  if (drivers > 0 || helpers > 0) {
+    return `${drivers} driver${drivers === 1 ? '' : 's'}${
+      helpers > 0 ? ` + ${helpers} helper${helpers === 1 ? '' : 's'}` : ''
+    }`
+  }
+  if (booking.helpersLabel && String(booking.helpersLabel).trim()) {
+    return String(booking.helpersLabel).trim()
+  }
+  if (booking.manRequired && String(booking.manRequired).trim()) {
+    return String(booking.manRequired).trim()
+  }
+  const men = Number(booking.men)
+  if (!Number.isNaN(men) && men > 0) {
+    return men === 1 ? '1 person' : `${men} people`
+  }
+  return '—'
+}
+
+/**
+ * Resolve driver/helper counts for display.
+ * Uses numeric fields when set; otherwise parses helpersLabel like "Driver + 1 helper".
+ */
+export function getBookingDriversAndHelpers(booking: any): {
+  drivers: number
+  helpers: number
+} {
+  if (!booking) return { drivers: 0, helpers: 0 }
+
+  const driversNum = Number(booking.drivers)
+  const helpersNum = Number(booking.helpers)
+  const hasMeaningfulNums =
+    (!Number.isNaN(driversNum) && driversNum > 0) ||
+    (!Number.isNaN(helpersNum) && helpersNum > 0)
+
+  if (hasMeaningfulNums) {
+    return {
+      drivers: Number.isNaN(driversNum) ? 0 : Math.max(0, driversNum),
+      helpers: Number.isNaN(helpersNum) ? 0 : Math.max(0, helpersNum),
+    }
+  }
+
+  const label = String(booking.helpersLabel || '').trim()
+  if (label) {
+    const helperMatch = label.match(/(\d+)\s*helpers?/i)
+    const hasHelperWord = /\bhelpers?\b/i.test(label)
+    const helpers = helperMatch ? Number(helperMatch[1]) : hasHelperWord ? 1 : 0
+
+    const driverMatch = label.match(/(\d+)\s*drivers?/i)
+    const hasDriverWord = /\bdrivers?\b/i.test(label)
+    const drivers = driverMatch ? Number(driverMatch[1]) : hasDriverWord ? 1 : 0
+
+    if (drivers > 0 || helpers > 0) {
+      return { drivers, helpers }
+    }
+  }
+
+  // Fallback: vans often equals drivers; men = drivers + helpers
+  const vans = Number(booking.vans)
+  const men = Number(booking.men)
+  if (!Number.isNaN(vans) && vans > 0) {
+    const drivers = vans
+    const helpers =
+      !Number.isNaN(men) && men > drivers ? men - drivers : 0
+    return { drivers, helpers }
+  }
+
+  return { drivers: 0, helpers: 0 }
+}
+
+/** Duration for display — bare numbers become "N hours". */
+export function formatDurationLabel(
+  durationRequired?: string | number | null,
+  hours?: number | null
+): string {
+  const raw =
+    durationRequired != null && String(durationRequired).trim() !== ''
+      ? String(durationRequired).trim()
+      : hours != null && !Number.isNaN(Number(hours))
+        ? String(hours)
+        : ''
+  if (!raw) return '—'
+  if (/hour/i.test(raw)) return raw
+  if (/^\d+(\.\d+)?$/.test(raw)) {
+    const n = Number(raw)
+    return `${raw} hour${n === 1 ? '' : 's'}`
+  }
+  return raw
+}
+
+export function formatStopsSummary(stops?: any[] | null): string | null {
+  if (!Array.isArray(stops) || stops.length === 0) return null
+  return `${stops.length} stop${stops.length === 1 ? '' : 's'}`
+}
+
 export function vanCountsFromBooking(booking: any): VanCounts {
   if (booking?.vanCounts) {
     return {

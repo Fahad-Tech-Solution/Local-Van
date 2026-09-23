@@ -104,14 +104,34 @@ export const driverApi = {
     return response.data
   },
 
-  updateJobStatus: async (id: string, status: string): Promise<{ message: string; booking: Booking }> => {
-    const response = await apiClient.put(`/driver/jobs/${id}/status`, { status })
+  updateJobStatus: async (
+    id: string,
+    status: string,
+    extra?: { pickupPhotos?: string[] }
+  ): Promise<{ message: string; booking: Booking }> => {
+    const response = await apiClient.put(`/driver/jobs/${id}/status`, {
+      status,
+      ...extra,
+    })
+    return response.data
+  },
+
+  startJob: async (
+    id: string,
+    data?: { pickupPhotos?: string[] }
+  ): Promise<{ message: string; booking: Booking }> => {
+    const response = await apiClient.post(`/driver/jobs/${id}/start`, data || {})
     return response.data
   },
 
   addCompletionDetails: async (
     id: string,
-    data: { pictures?: string[]; notes?: string }
+    data: {
+      pictures?: string[]
+      notes?: string
+      pickupPhotos?: string[]
+      dropoffPhotos?: string[]
+    }
   ): Promise<{ message: string; booking: Booking }> => {
     const response = await apiClient.post(`/driver/jobs/${id}/complete`, data)
     return response.data
@@ -119,6 +139,14 @@ export const driverApi = {
 
   disputeJob: async (id: string, reason: string): Promise<{ message: string; booking: Booking }> => {
     const response = await apiClient.post(`/driver/jobs/${id}/dispute`, { reason })
+    return response.data
+  },
+
+  cancelTakenJob: async (
+    id: string,
+    reason?: string
+  ): Promise<{ message: string; booking: Booking }> => {
+    const response = await apiClient.post(`/driver/jobs/${id}/cancel`, { reason })
     return response.data
   },
 

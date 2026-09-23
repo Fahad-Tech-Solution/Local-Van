@@ -6,6 +6,8 @@ import { GoogleMapsLink } from '@/components/GoogleMapsLink'
 import {
   formatServiceExtrasLabel,
   formatVanCountsLabel,
+  formatBookingPeopleLabel,
+  formatStopsSummary,
 } from '@/utils/manualBookingExtras'
 import { formatCurrency, formatDate } from '@/utils/format'
 import { Calendar, Clock, MapPin, Package, Phone, Truck, Users } from 'lucide-react'
@@ -16,6 +18,8 @@ type DriverJobCardProps = {
   price?: number | null
   priceLabel?: string
   showStatus?: boolean
+  /** Hide customer phone / contact line (e.g. pending job offers). */
+  hideContact?: boolean
   footer?: ReactNode
   className?: string
 }
@@ -33,21 +37,6 @@ function vehicleText(booking: any) {
   return String(booking.vehicleType).replace(/-/g, ' ')
 }
 
-function peopleText(booking: any) {
-  const drivers = Number(booking.drivers)
-  const helpers = Number(booking.helpers)
-  if (!Number.isNaN(drivers) || !Number.isNaN(helpers)) {
-    const d = Number.isNaN(drivers) ? 0 : drivers
-    const h = Number.isNaN(helpers) ? 0 : helpers
-    if (d || h) {
-      return `${d} driver${d === 1 ? '' : 's'}${h > 0 ? ` · ${h} helper${h === 1 ? '' : 's'}` : ''}`
-    }
-  }
-  if (booking.helpersLabel) return booking.helpersLabel
-  if (booking.men) return `${booking.men} people`
-  return null
-}
-
 function serviceText(booking: any) {
   if (!booking.serviceType) return null
   if (booking.serviceType === 'long-distance') return 'Long Distance'
@@ -62,18 +51,21 @@ export function DriverJobCard({
   price,
   priceLabel = 'Pay',
   showStatus = true,
+  hideContact = false,
   footer,
   className = '',
 }: DriverJobCardProps) {
   const displayPrice =
     price ?? booking.finalPrice ?? booking.estimatedPrice ?? null
   const vehicle = vehicleText(booking)
-  const people = peopleText(booking)
+  const people = formatBookingPeopleLabel(booking)
   const service = serviceText(booking)
   const extras = formatServiceExtrasLabel(booking.serviceExtras)
-  const phone =
-    booking.contactPhone ||
-    (typeof booking.customer === 'object' ? booking.customer?.phone : null)
+  const stopsSummary = formatStopsSummary(booking.stops)
+  const phone = hideContact
+    ? null
+    : booking.contactPhone ||
+      (typeof booking.customer === 'object' ? booking.customer?.phone : null)
 
   const inner = (
     <div
@@ -150,13 +142,19 @@ export function DriverJobCard({
             {vehicle}
           </span>
         )}
-        {people && (
+        {people && people !== '—' && (
           <span className="inline-flex items-center gap-1">
             <Users className="h-3.5 w-3.5" />
             {people}
           </span>
         )}
-        {extras && extras !== 'None' && <span>Extras: {extras}</span>}
+        {stopsSummary && (
+          <span className="inline-flex items-center gap-1">
+            <MapPin className="h-3.5 w-3.5" />
+            {stopsSummary}
+          </span>
+        )}
+        {extras && extras !== 'None' && extras !== '—' && <span>Extras: {extras}</span>}
       </div>
 
       <div className="flex flex-wrap gap-x-3 gap-y-1">

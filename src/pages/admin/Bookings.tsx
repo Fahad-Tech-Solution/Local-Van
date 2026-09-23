@@ -636,7 +636,7 @@ const BookingsPage = () => {
     ['pending', 'offered'].includes(booking.status) && !booking.driver
 
   const canReofferJob = (booking: any) =>
-    !!booking.driver && ['confirmed', 'in-progress', 'offered'].includes(booking.status)
+    !!booking.driver && ['confirmed', 'in-progress', 'job-started', 'offered'].includes(booking.status)
 
   const canAssignDriver = (booking: any) =>
     !['completed', 'cancelled'].includes(booking.status)
@@ -727,6 +727,7 @@ const BookingsPage = () => {
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="offered">Offered</SelectItem>
                   <SelectItem value="confirmed">Confirmed</SelectItem>
+                  <SelectItem value="job-started">Job Started</SelectItem>
                   <SelectItem value="in-progress">In Progress</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
@@ -1805,6 +1806,58 @@ const BookingsPage = () => {
                   </div>
                 </SectionShell>
 
+                {((viewingBooking.pickupPhotos && viewingBooking.pickupPhotos.length > 0) ||
+                  (viewingBooking.dropoffPhotos && viewingBooking.dropoffPhotos.length > 0) ||
+                  (viewingBooking.completionPictures &&
+                    viewingBooking.completionPictures.length > 0)) && (
+                  <SectionShell title="Job photos">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {viewingBooking.pickupPhotos && viewingBooking.pickupPhotos.length > 0 && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-2">Pickup</p>
+                          <div className="grid grid-cols-3 gap-2">
+                            {viewingBooking.pickupPhotos.map((pic: string, index: number) => (
+                              <img
+                                key={`view-pickup-${index}`}
+                                src={pic}
+                                alt={`Pickup ${index + 1}`}
+                                className="w-full h-24 object-cover rounded-lg border"
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {((viewingBooking.dropoffPhotos &&
+                        viewingBooking.dropoffPhotos.length > 0) ||
+                        (viewingBooking.completionPictures &&
+                          viewingBooking.completionPictures.length > 0)) && (
+                        <div>
+                          <p className="text-xs text-muted-foreground mb-2">Drop-off</p>
+                          <div className="grid grid-cols-3 gap-2">
+                            {(viewingBooking.dropoffPhotos?.length
+                              ? viewingBooking.dropoffPhotos
+                              : viewingBooking.completionPictures || []
+                            ).map((pic: string, index: number) => (
+                              <img
+                                key={`view-dropoff-${index}`}
+                                src={pic}
+                                alt={`Drop-off ${index + 1}`}
+                                className="w-full h-24 object-cover rounded-lg border"
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    {viewingBooking.driverNotes && (
+                      <p className="text-sm mt-3">
+                        <span className="text-muted-foreground">Driver notes: </span>
+                        {viewingBooking.driverNotes}
+                      </p>
+                    )}
+                  </SectionShell>
+                )}
+
                 {viewingBooking.notes?.length > 0 && (
                   <SectionShell title="Notes">
                     <div className="space-y-2">
@@ -1878,6 +1931,7 @@ const BookingsPage = () => {
                           <SelectItem value="survey">Survey</SelectItem>
                           <SelectItem value="offered">Offered</SelectItem>
                           <SelectItem value="confirmed">Confirmed</SelectItem>
+                          <SelectItem value="job-started">Job Started</SelectItem>
                           <SelectItem value="in-progress">In Progress</SelectItem>
                           <SelectItem value="completed">Completed</SelectItem>
                           <SelectItem value="cancelled">Cancelled</SelectItem>

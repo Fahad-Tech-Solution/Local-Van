@@ -74,6 +74,7 @@ const AvailableJobsPage = () => {
                   price={offeredPrice}
                   priceLabel="Offer"
                   showStatus={false}
+                  hideContact
                   footer={
                     <div className="space-y-3 pt-1">
                       {booking.offerExpiresAt && (
@@ -101,7 +102,7 @@ const AvailableJobsPage = () => {
                         </Button>
                       </div>
                       <Button asChild variant="ghost" className="w-full">
-                        <Link to={`/driver/jobs/${booking._id}`}>View full details</Link>
+                        <Link to={`/driver/jobs/${booking._id}`}>View job details</Link>
                       </Button>
                     </div>
                   }

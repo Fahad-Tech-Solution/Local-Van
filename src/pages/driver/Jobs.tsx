@@ -9,7 +9,7 @@ import {
   XCircle,
 } from 'lucide-react'
 import { useDriverJobs } from '@/hooks/useDriver'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from 'react-query'
 import { driverApi } from '@/api/driver'
 import { useAuth } from '@/hooks/useAuth'
@@ -27,7 +27,9 @@ import {
 const VALID_STATUS_FILTERS = [
   'all',
   'pending',
+  'offered',
   'confirmed',
+  'job-started',
   'in-progress',
   'completed',
   'disputed',
@@ -84,7 +86,7 @@ const DriverJobsPage = () => {
     limit: 20,
   })
   const { data: inProgressJobsData, isLoading: isInProgressLoading } = useDriverJobs({
-    status: 'in-progress',
+    status: 'job-started',
     page: 1,
     limit: 20,
   })
@@ -130,8 +132,10 @@ const DriverJobsPage = () => {
     return combined
       .filter((booking: any) => new Date(booking.pickupDate).getTime() >= todayStart.getTime())
       .sort((a: any, b: any) => {
-        if (a.status === 'in-progress' && b.status !== 'in-progress') return -1
-        if (b.status === 'in-progress' && a.status !== 'in-progress') return 1
+        const aStarted = a.status === 'job-started' || a.status === 'in-progress'
+        const bStarted = b.status === 'job-started' || b.status === 'in-progress'
+        if (aStarted && !bStarted) return -1
+        if (bStarted && !aStarted) return 1
         return new Date(a.pickupDate).getTime() - new Date(b.pickupDate).getTime()
       })
       .slice(0, 5)
@@ -170,24 +174,30 @@ const DriverJobsPage = () => {
                       price={offeredPrice}
                       priceLabel="Offer"
                       showStatus={false}
+                      hideContact
                       footer={
-                        <div className="flex gap-2 pt-1">
-                          <Button
-                            onClick={() => handleAccept(booking._id)}
-                            disabled={acceptMutation.isLoading || rejectMutation.isLoading}
-                            className="flex-1"
-                          >
-                            <CheckCircle className="mr-2 h-4 w-4" />
-                            Accept ({formatCurrency(offeredPrice)})
-                          </Button>
-                          <Button
-                            variant="outline"
-                            onClick={() => handleReject(booking._id)}
-                            disabled={acceptMutation.isLoading || rejectMutation.isLoading}
-                            className="flex-1"
-                          >
-                            <XCircle className="mr-2 h-4 w-4" />
-                            Reject
+                        <div className="space-y-2 pt-1">
+                          <div className="flex gap-2">
+                            <Button
+                              onClick={() => handleAccept(booking._id)}
+                              disabled={acceptMutation.isLoading || rejectMutation.isLoading}
+                              className="flex-1"
+                            >
+                              <CheckCircle className="mr-2 h-4 w-4" />
+                              Accept ({formatCurrency(offeredPrice)})
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={() => handleReject(booking._id)}
+                              disabled={acceptMutation.isLoading || rejectMutation.isLoading}
+                              className="flex-1"
+                            >
+                              <XCircle className="mr-2 h-4 w-4" />
+                              Reject
+                            </Button>
+                          </div>
+                          <Button asChild variant="ghost" className="w-full">
+                            <Link to={`/driver/jobs/${booking._id}`}>View job details</Link>
                           </Button>
                         </div>
                       }
@@ -248,7 +258,7 @@ const DriverJobsPage = () => {
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="offered">Offered</SelectItem>
                   <SelectItem value="confirmed">Confirmed</SelectItem>
-                  <SelectItem value="in-progress">In Progress</SelectItem>
+                  <SelectItem value="job-started">Job Started</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
                   <SelectItem value="disputed">Disputed</SelectItem>
                 </SelectContent>

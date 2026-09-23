@@ -11,6 +11,8 @@ export const BOOKING_STATUS_STYLES: Record<string, string> = {
     'border-teal-200 bg-teal-50 text-teal-800',
   'in-progress':
     'border-amber-200 bg-amber-50 text-amber-900',
+  'job-started':
+    'border-amber-200 bg-amber-50 text-amber-900',
   completed:
     'border-emerald-200 bg-emerald-50 text-emerald-800',
   cancelled:

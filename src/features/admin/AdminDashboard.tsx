@@ -168,7 +168,7 @@ const AdminDashboard = () => {
                   </p>
                   {(stats?.revenue.pipeline ?? 0) > 0 && (
                     <p className="text-xs text-muted-foreground mt-1">
-                      Pipeline (confirmed/in-progress):{' '}
+                      Pipeline (confirmed/job started):{' '}
                       {formatCurrencyWhole(stats?.revenue.pipeline)}
                     </p>
                   )}

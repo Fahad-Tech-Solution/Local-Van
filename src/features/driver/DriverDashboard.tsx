@@ -200,6 +200,7 @@ const DriverDashboard = () => {
                             price={offeredPrice}
                             priceLabel="Offer"
                             showStatus={false}
+                            hideContact
                             footer={
                               <div className="flex flex-col gap-2 pt-1">
                                 <div className="flex gap-2">
@@ -228,7 +229,7 @@ const DriverDashboard = () => {
                                   </Button>
                                 </div>
                                 <Button asChild size="sm" variant="ghost" className="w-full">
-                                  <Link to={`/driver/jobs/${booking._id}`}>View details</Link>
+                                  <Link to={`/driver/jobs/${booking._id}`}>View job details</Link>
                                 </Button>
                               </div>
                             }

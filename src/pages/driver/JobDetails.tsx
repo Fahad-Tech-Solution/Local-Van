@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import DashboardLayout from '@/components/layouts/DashboardLayout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -7,7 +7,6 @@ import { Badge } from '@/components/ui/badge'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { Input } from '@/components/ui/input'
 import {
   MapPin,
   Loader2,
@@ -18,9 +17,10 @@ import {
 } from 'lucide-react'
 import {
   useDriverJob,
-  useUpdateJobStatus,
+  useStartJob,
   useAddCompletionDetails,
   useDisputeJob,
+  useCancelTakenJob,
   useAcceptJobOffer,
   useRejectJobOffer,
 } from '@/hooks/useDriver'
@@ -29,11 +29,14 @@ import { getOfferForDriver } from '@/utils/driverOffers'
 import { formatCurrency, formatDate, formatDateTime } from '@/utils/format'
 import { formatStairsDisplay, formatAccessFromAdmin } from '@/utils/stairsAccess'
 import {
-  formatServiceExtrasLabel,
   formatVanCountsLabel,
+  formatDurationLabel,
+  getBookingDriversAndHelpers,
+  serviceExtrasFromBooking,
 } from '@/utils/manualBookingExtras'
 import { GoogleMapsLink } from '@/components/GoogleMapsLink'
 import { ReadField, SectionShell } from '@/components/booking/SectionShell'
+import { MultiImageUpload } from '@/components/ui/multi-image-upload'
 import {
   Dialog,
   DialogContent,
@@ -42,13 +45,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 
 const serviceLabel = (value?: string) => {
   if (value === 'long-distance') return 'Long Distance'
@@ -60,34 +56,33 @@ const serviceLabel = (value?: string) => {
 const vehicleLabel = (value?: string) =>
   value?.split('-').map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(' ') || '—'
 
-const formatPeopleSplit = (drivers?: number, helpers?: number, men?: number) => {
-  if (drivers != null || helpers != null) {
-    const d = Number(drivers) || 0
-    const h = Number(helpers) || 0
-    return `${d} driver${d === 1 ? '' : 's'}${h > 0 ? ` + ${h} helper${h === 1 ? '' : 's'}` : ''} (${d + h} total)`
-  }
-  if (!men || men < 1) return '—'
-  return men === 1 ? '1 person' : `${men} people`
-}
-
 const JobDetailsPage = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { user } = useAuth()
   const { data: job, isLoading } = useDriverJob(id || '')
-  const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false)
-  const [isCompleteDialogOpen, setIsCompleteDialogOpen] = useState(false)
   const [isDisputeDialogOpen, setIsDisputeDialogOpen] = useState(false)
-  const [newStatus, setNewStatus] = useState('')
+  const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false)
   const [completionNotes, setCompletionNotes] = useState('')
-  const [completionPictures, setCompletionPictures] = useState<string[]>([])
+  const [pickupPhotos, setPickupPhotos] = useState<string[]>([])
+  const [dropoffPhotos, setDropoffPhotos] = useState<string[]>([])
   const [disputeReason, setDisputeReason] = useState('')
+  const [cancelReason, setCancelReason] = useState('')
+  const [photosHydrated, setPhotosHydrated] = useState(false)
 
-  const updateStatusMutation = useUpdateJobStatus()
+  const startJobMutation = useStartJob()
   const addCompletionMutation = useAddCompletionDetails()
   const disputeMutation = useDisputeJob()
+  const cancelMutation = useCancelTakenJob()
   const acceptMutation = useAcceptJobOffer()
   const rejectMutation = useRejectJobOffer()
+
+  useEffect(() => {
+    setPhotosHydrated(false)
+    setPickupPhotos([])
+    setDropoffPhotos([])
+    setCompletionNotes('')
+  }, [id])
 
   const handleAcceptOffer = async () => {
     if (!id || !confirm('Are you sure you want to accept this job offer?')) return
@@ -100,25 +95,25 @@ const JobDetailsPage = () => {
     navigate('/driver/available-jobs')
   }
 
-  const handleStatusUpdate = async () => {
-    if (!id || !newStatus) return
-    await updateStatusMutation.mutateAsync({ id, status: newStatus })
-    setIsStatusDialogOpen(false)
-    setNewStatus('')
+  const handleStartJob = async () => {
+    if (!id || !confirm('Start this job now?')) return
+    await startJobMutation.mutateAsync({
+      id,
+      pickupPhotos: pickupPhotos.slice(0, 3),
+    })
   }
 
-  const handleComplete = async () => {
-    if (!id) return
+  const handleFinishJob = async () => {
+    if (!id || !confirm('Mark this job as finished?')) return
     await addCompletionMutation.mutateAsync({
       id,
       data: {
-        notes: completionNotes,
-        pictures: completionPictures,
+        notes: completionNotes || undefined,
+        pickupPhotos: pickupPhotos.slice(0, 3),
+        dropoffPhotos: dropoffPhotos.slice(0, 3),
       },
     })
-    setIsCompleteDialogOpen(false)
     setCompletionNotes('')
-    setCompletionPictures([])
   }
 
   const handleDispute = async () => {
@@ -127,6 +122,31 @@ const JobDetailsPage = () => {
     setIsDisputeDialogOpen(false)
     setDisputeReason('')
   }
+
+  const handleCancelJob = async () => {
+    if (!id) return
+    await cancelMutation.mutateAsync({
+      id,
+      reason: cancelReason.trim() || undefined,
+    })
+    setIsCancelDialogOpen(false)
+    setCancelReason('')
+    navigate('/driver/jobs')
+  }
+
+  useEffect(() => {
+    if (!job || photosHydrated) return
+    const j = job as any
+    const existingPickup = Array.isArray(j.pickupPhotos) ? j.pickupPhotos : []
+    const existingDropoff = Array.isArray(j.dropoffPhotos)
+      ? j.dropoffPhotos
+      : Array.isArray(job.completionPictures)
+        ? job.completionPictures
+        : []
+    setPickupPhotos(existingPickup.slice(0, 3))
+    setDropoffPhotos(existingDropoff.slice(0, 3))
+    setPhotosHydrated(true)
+  }, [job, photosHydrated])
 
   if (isLoading) {
     return (
@@ -159,12 +179,20 @@ const JobDetailsPage = () => {
     ['pending', 'offered'].includes(job.status) &&
     !hasAssignedDriver &&
     !isOfferExpired
-  const canUpdateStatus = ['confirmed', 'in-progress'].includes(job.status)
-  const canComplete = ['confirmed', 'in-progress'].includes(job.status)
+  const canStartJob = job.status === 'confirmed'
+  const jobIsStarted = job.status === 'job-started' || job.status === 'in-progress'
+  const canCancelJob =
+    hasAssignedDriver &&
+    ['confirmed', 'job-started', 'in-progress'].includes(job.status)
   const canDispute =
-    ['confirmed', 'in-progress', 'completed'].includes(job.status) && !job.isDisputed
+    ['confirmed', 'job-started', 'in-progress', 'completed'].includes(job.status) &&
+    !job.isDisputed
   const offeredPrice = offer?.offeredPrice ?? job.finalPrice ?? job.estimatedPrice
   const j = job as any
+  const extras = serviceExtrasFromBooking(j)
+  const { drivers: driversCount, helpers: helpersCount } =
+    getBookingDriversAndHelpers(j)
+  const stops = Array.isArray(j.stops) ? j.stops : []
 
   return (
     <DashboardLayout role="driver">
@@ -185,17 +213,21 @@ const JobDetailsPage = () => {
         <div className="space-y-5">
           <SectionShell title="General details" icon={<Package className="h-4 w-4 text-muted-foreground" />}>
             <div className="grid gap-4 sm:grid-cols-2">
-              <ReadField
-                label="Customer"
-                value={typeof job.customer === 'object' ? job.customer.name : 'Unknown'}
-              />
-              <ReadField
-                label="Email"
-                value={
-                  typeof job.customer === 'object' ? job.customer.email : job.contactEmail
-                }
-              />
-              <ReadField label="Phone" value={job.contactPhone} />
+              {!canRespondToOffer && (
+                <>
+                  <ReadField
+                    label="Customer"
+                    value={typeof job.customer === 'object' ? job.customer.name : 'Unknown'}
+                  />
+                  <ReadField
+                    label="Email"
+                    value={
+                      typeof job.customer === 'object' ? job.customer.email : job.contactEmail
+                    }
+                  />
+                  <ReadField label="Phone" value={job.contactPhone} />
+                </>
+              )}
               <ReadField label="Service type" value={serviceLabel(j.serviceType)} />
               <ReadField
                 label="Vehicle / vans"
@@ -206,19 +238,37 @@ const JobDetailsPage = () => {
                 }
               />
               <ReadField
-                label="People"
-                value={formatPeopleSplit(j.drivers, j.helpers, j.men)}
+                label="Drivers"
+                value={String(driversCount)}
               />
-              <ReadField label="Extras" value={formatServiceExtrasLabel(j.serviceExtras)} />
+              <ReadField
+                label="Helpers"
+                value={String(helpersCount)}
+              />
+              <ReadField
+                label="Dismantle items"
+                value={String(extras.dismantleItems)}
+              />
+              <ReadField
+                label="Assembly items"
+                value={String(extras.assemblyItems)}
+              />
+              <ReadField
+                label="Packing boxes"
+                value={String(extras.packingBoxes)}
+              />
               <ReadField
                 label={canRespondToOffer ? 'Offered pay' : 'Price'}
                 value={formatCurrency(offeredPrice)}
               />
-              {j.durationRequired && (
-                <ReadField label="Duration" value={j.durationRequired} />
+              {(j.durationRequired || j.hours != null) && (
+                <ReadField
+                  label="Duration"
+                  value={formatDurationLabel(j.durationRequired, j.hours)}
+                />
               )}
               {j.miles != null && <ReadField label="Miles" value={j.miles} />}
-              {job.offerExpiresAt && (
+              {job.offerExpiresAt && canRespondToOffer && (
                 <ReadField
                   label="Offer expires"
                   value={formatDateTime(job.offerExpiresAt)}
@@ -226,7 +276,21 @@ const JobDetailsPage = () => {
               )}
               <ReadField label="Special instructions" value={j.specialInstructions} />
             </div>
-            {j.additionalWorkPayment ? (
+            {Array.isArray(j.items) && j.items.length > 0 && (
+              <div className="rounded-lg border bg-white p-3 space-y-2">
+                <p className="text-xs text-muted-foreground">Listed items</p>
+                <ul className="text-sm space-y-1">
+                  {j.items.map((item: any, index: number) => (
+                    <li key={index}>
+                      {item.quantity ? `${item.quantity}× ` : ''}
+                      {item.name || 'Item'}
+                      {item.description ? ` — ${item.description}` : ''}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {!canRespondToOffer && j.additionalWorkPayment ? (
               <div className="grid gap-4 sm:grid-cols-2 rounded-lg border bg-white p-3">
                 <ReadField
                   label="Additional work"
@@ -238,9 +302,10 @@ const JobDetailsPage = () => {
                 />
               </div>
             ) : null}
-            {canRespondToOffer && offer?.offeredPrice != null && (
+            {canRespondToOffer && (
               <p className="text-xs text-muted-foreground">
-                Admin offer (percentage of booking) — not customer list price
+                Showing job logistics only. Customer contact details and booking list price are
+                hidden until you accept.
               </p>
             )}
           </SectionShell>
@@ -261,13 +326,13 @@ const JobDetailsPage = () => {
             />
           </SectionShell>
 
-          {Array.isArray(j.stops) && j.stops.length > 0 && (
-            <SectionShell
-              title="Intermediate stops"
-              icon={<MapPin className="h-4 w-4 text-muted-foreground" />}
-            >
+          <SectionShell
+            title="Intermediate stops"
+            icon={<MapPin className="h-4 w-4 text-muted-foreground" />}
+          >
+            {stops.length > 0 ? (
               <div className="space-y-4">
-                {j.stops.map((stop: any, index: number) => (
+                {stops.map((stop: any, index: number) => (
                   <div
                     key={index}
                     className="rounded-lg border bg-white p-3 space-y-3"
@@ -281,6 +346,7 @@ const JobDetailsPage = () => {
                         label="Access"
                         value={
                           formatAccessFromAdmin(stop.access, stop.stairsCount) ||
+                          stop.accessLabel ||
                           stop.access ||
                           '—'
                         }
@@ -295,8 +361,10 @@ const JobDetailsPage = () => {
                   </div>
                 ))}
               </div>
-            </SectionShell>
-          )}
+            ) : (
+              <p className="text-sm text-muted-foreground">No intermediate stops</p>
+            )}
+          </SectionShell>
 
           <SectionShell
             title="Drop-off details"
@@ -315,20 +383,48 @@ const JobDetailsPage = () => {
             />
           </SectionShell>
 
-          {job.completionPictures && job.completionPictures.length > 0 && (
-            <SectionShell title="Completion pictures">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {job.completionPictures.map((pic: string, index: number) => (
-                  <img
-                    key={index}
-                    src={pic}
-                    alt={`Completion ${index + 1}`}
-                    className="w-full h-32 object-cover rounded-lg border"
-                  />
-                ))}
+          {(Array.isArray(j.pickupPhotos) && j.pickupPhotos.length > 0) ||
+          (Array.isArray(j.dropoffPhotos) && j.dropoffPhotos.length > 0) ||
+          (job.completionPictures && job.completionPictures.length > 0) ? (
+            <SectionShell title="Job photos">
+              <div className="grid gap-4 sm:grid-cols-2">
+                {Array.isArray(j.pickupPhotos) && j.pickupPhotos.length > 0 && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2">Pickup</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {j.pickupPhotos.map((pic: string, index: number) => (
+                        <img
+                          key={`pickup-${index}`}
+                          src={pic}
+                          alt={`Pickup ${index + 1}`}
+                          className="w-full h-24 object-cover rounded-lg border"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {((Array.isArray(j.dropoffPhotos) && j.dropoffPhotos.length > 0) ||
+                  (job.completionPictures && job.completionPictures.length > 0)) && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-2">Drop-off</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(j.dropoffPhotos?.length
+                        ? j.dropoffPhotos
+                        : job.completionPictures || []
+                      ).map((pic: string, index: number) => (
+                        <img
+                          key={`dropoff-${index}`}
+                          src={pic}
+                          alt={`Drop-off ${index + 1}`}
+                          className="w-full h-24 object-cover rounded-lg border"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </SectionShell>
-          )}
+          ) : null}
 
           {job.driverNotes && (
             <SectionShell title="Driver notes">
@@ -358,122 +454,184 @@ const JobDetailsPage = () => {
             </SectionShell>
           )}
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Actions</CardTitle>
-            </CardHeader>
-            <CardContent className="flex gap-2 flex-wrap">
-              {canRespondToOffer && (
-                <>
-                  <Button
-                    onClick={handleAcceptOffer}
-                    disabled={acceptMutation.isLoading || rejectMutation.isLoading}
-                    className="flex-1 min-w-[140px]"
-                  >
-                    <CheckCircle className="mr-2 h-4 w-4" />
-                    Accept Offer ({formatCurrency(offeredPrice)})
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleRejectOffer}
-                    disabled={acceptMutation.isLoading || rejectMutation.isLoading}
-                    className="flex-1 min-w-[140px]"
-                  >
-                    <XCircle className="mr-2 h-4 w-4" />
-                    Reject
-                  </Button>
-                </>
-              )}
-              {canUpdateStatus && (
-                <Button onClick={() => setIsStatusDialogOpen(true)}>Update Status</Button>
-              )}
-              {canComplete && (
-                <Button variant="outline" onClick={() => setIsCompleteDialogOpen(true)}>
-                  Complete Job
-                </Button>
-              )}
-              {canDispute && (
-                <Button variant="destructive" onClick={() => setIsDisputeDialogOpen(true)}>
-                  Dispute Job
-                </Button>
-              )}
-              {!canRespondToOffer && !canUpdateStatus && !canComplete && !canDispute && (
-                <p className="text-sm text-muted-foreground">No actions available for this job.</p>
-              )}
-            </CardContent>
-          </Card>
+          {(canRespondToOffer || canStartJob || jobIsStarted || canDispute || canCancelJob) && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                {canRespondToOffer && (
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Button
+                      onClick={handleAcceptOffer}
+                      disabled={acceptMutation.isLoading || rejectMutation.isLoading}
+                      className="flex-1"
+                    >
+                      <CheckCircle className="mr-2 h-4 w-4" />
+                      Accept Offer ({formatCurrency(offeredPrice)})
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={handleRejectOffer}
+                      disabled={acceptMutation.isLoading || rejectMutation.isLoading}
+                      className="flex-1"
+                    >
+                      <XCircle className="mr-2 h-4 w-4" />
+                      Reject
+                    </Button>
+                  </div>
+                )}
+
+                {(canStartJob || jobIsStarted) && (
+                  <div className="space-y-4">
+                    <MultiImageUpload
+                      label="Pickup photos (optional)"
+                      description="Up to 3 photos from the pickup location"
+                      values={pickupPhotos}
+                      onChange={setPickupPhotos}
+                      max={3}
+                      folder="jobs/pickup"
+                      disabled={job.status === 'completed' || job.isDisputed}
+                    />
+
+                    {jobIsStarted && (
+                      <>
+                        <MultiImageUpload
+                          label="Drop-off photos (optional)"
+                          description="Up to 3 photos from the drop-off location"
+                          values={dropoffPhotos}
+                          onChange={setDropoffPhotos}
+                          max={3}
+                          folder="jobs/dropoff"
+                          disabled={job.status === 'completed' || job.isDisputed}
+                        />
+                        <div>
+                          <Label htmlFor="completionNotes">Notes (optional)</Label>
+                          <Textarea
+                            id="completionNotes"
+                            className="mt-1.5"
+                            value={completionNotes}
+                            onChange={(e) => setCompletionNotes(e.target.value)}
+                            placeholder="Any notes about the job..."
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                      {canStartJob && (
+                        <Button
+                          onClick={handleStartJob}
+                          disabled={startJobMutation.isLoading || cancelMutation.isLoading}
+                          className="flex-1"
+                        >
+                          {startJobMutation.isLoading ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Starting...
+                            </>
+                          ) : (
+                            'Start the job'
+                          )}
+                        </Button>
+                      )}
+                      {jobIsStarted && (
+                        <Button
+                          onClick={handleFinishJob}
+                          disabled={addCompletionMutation.isLoading || cancelMutation.isLoading}
+                          className="flex-1"
+                        >
+                          {addCompletionMutation.isLoading ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Finishing...
+                            </>
+                          ) : (
+                            'Finish the job'
+                          )}
+                        </Button>
+                      )}
+                      {canCancelJob && (
+                        <Button
+                          variant="outline"
+                          onClick={() => setIsCancelDialogOpen(true)}
+                          disabled={cancelMutation.isLoading}
+                          className="flex-1 sm:flex-none"
+                        >
+                          Cancel job
+                        </Button>
+                      )}
+                      {canDispute && (
+                        <Button
+                          variant="destructive"
+                          onClick={() => setIsDisputeDialogOpen(true)}
+                          className="flex-1 sm:flex-none"
+                        >
+                          Dispute
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {!canRespondToOffer &&
+                  !canStartJob &&
+                  !jobIsStarted &&
+                  (canCancelJob || canDispute) && (
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      {canCancelJob && (
+                        <Button
+                          variant="outline"
+                          onClick={() => setIsCancelDialogOpen(true)}
+                          disabled={cancelMutation.isLoading}
+                        >
+                          Cancel job
+                        </Button>
+                      )}
+                      {canDispute && (
+                        <Button
+                          variant="destructive"
+                          onClick={() => setIsDisputeDialogOpen(true)}
+                        >
+                          Dispute
+                        </Button>
+                      )}
+                    </div>
+                  )}
+              </CardContent>
+            </Card>
+          )}
         </div>
 
-        <Dialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
+        <Dialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Update Job Status</DialogTitle>
+              <DialogTitle>Cancel this job?</DialogTitle>
+              <DialogDescription>
+                The job will be released and become available for admin to reassign. Admin will be
+                notified.
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label>New Status</Label>
-                <Select value={newStatus} onValueChange={setNewStatus}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="in-progress">In Progress</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label>Reason (optional)</Label>
+                <Textarea
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  placeholder="Why are you cancelling this job?"
+                />
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsStatusDialogOpen(false)}>
-                Cancel
+              <Button variant="outline" onClick={() => setIsCancelDialogOpen(false)}>
+                Keep job
               </Button>
               <Button
-                onClick={handleStatusUpdate}
-                disabled={!newStatus || updateStatusMutation.isLoading}
+                variant="destructive"
+                onClick={handleCancelJob}
+                disabled={cancelMutation.isLoading}
               >
-                {updateStatusMutation.isLoading ? 'Updating...' : 'Update'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={isCompleteDialogOpen} onOpenChange={setIsCompleteDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Complete Job</DialogTitle>
-              <DialogDescription>Add completion details and notes</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label>Notes</Label>
-                <Textarea
-                  value={completionNotes}
-                  onChange={(e) => setCompletionNotes(e.target.value)}
-                  placeholder="Add any notes about the job completion..."
-                />
-              </div>
-              <div>
-                <Label>Pictures (URLs, comma-separated)</Label>
-                <Input
-                  value={completionPictures.join(', ')}
-                  onChange={(e) =>
-                    setCompletionPictures(
-                      e.target.value
-                        .split(',')
-                        .map((s) => s.trim())
-                        .filter(Boolean)
-                    )
-                  }
-                  placeholder="https://example.com/image1.jpg, https://example.com/image2.jpg"
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsCompleteDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleComplete} disabled={addCompletionMutation.isLoading}>
-                {addCompletionMutation.isLoading ? 'Completing...' : 'Complete Job'}
+                {cancelMutation.isLoading ? 'Cancelling...' : 'Cancel job'}
               </Button>
             </DialogFooter>
           </DialogContent>

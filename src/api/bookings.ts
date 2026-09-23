@@ -39,7 +39,7 @@ export interface Booking {
     email: string
     phone?: string
   }
-  status: 'pending' | 'offered' | 'confirmed' | 'in-progress' | 'completed' | 'cancelled' | 'survey'
+  status: 'pending' | 'offered' | 'confirmed' | 'in-progress' | 'job-started' | 'completed' | 'cancelled' | 'survey'
   pickupAddress: string
   pickupCity: string
   pickupState: string
@@ -65,6 +65,10 @@ export interface Booking {
   vans?: number
   additionalWorkPayment?: number
   additionalWorkDescription?: string
+  completionPictures?: string[]
+  pickupPhotos?: string[]
+  dropoffPhotos?: string[]
+  driverNotes?: string
   createdAt: string
   updatedAt: string
   completedAt?: string

@@ -49,11 +49,37 @@ export const useUpdateJobStatus = () => {
   )
 }
 
+export const useStartJob = () => {
+  const queryClient = useQueryClient()
+  return useMutation(
+    ({ id, pickupPhotos }: { id: string; pickupPhotos?: string[] }) =>
+      driverApi.startJob(id, { pickupPhotos }),
+    {
+      onSuccess: (data, variables) => {
+        queryClient.setQueryData(['driverJob', variables.id], data.booking)
+        queryClient.invalidateQueries(['driverJob', variables.id])
+        queryClient.invalidateQueries('driverJobs')
+        queryClient.invalidateQueries('driverStats')
+      },
+    }
+  )
+}
+
 export const useAddCompletionDetails = () => {
   const queryClient = useQueryClient()
   return useMutation(
-    ({ id, data }: { id: string; data: { pictures?: string[]; notes?: string } }) =>
-      driverApi.addCompletionDetails(id, data),
+    ({
+      id,
+      data,
+    }: {
+      id: string
+      data: {
+        pictures?: string[]
+        notes?: string
+        pickupPhotos?: string[]
+        dropoffPhotos?: string[]
+      }
+    }) => driverApi.addCompletionDetails(id, data),
     {
       onSuccess: (data, variables) => {
         queryClient.setQueryData(['driverJob', variables.id], data.booking)
@@ -75,6 +101,22 @@ export const useDisputeJob = () => {
         queryClient.invalidateQueries(['driverJob', variables.id])
         queryClient.invalidateQueries('driverJobs')
         queryClient.invalidateQueries('driverStats')
+      },
+    }
+  )
+}
+
+export const useCancelTakenJob = () => {
+  const queryClient = useQueryClient()
+  return useMutation(
+    ({ id, reason }: { id: string; reason?: string }) =>
+      driverApi.cancelTakenJob(id, reason),
+    {
+      onSuccess: (_, variables) => {
+        queryClient.removeQueries(['driverJob', variables.id])
+        queryClient.invalidateQueries('driverJobs')
+        queryClient.invalidateQueries('driverStats')
+        queryClient.invalidateQueries('availableJobs')
       },
     }
   )
