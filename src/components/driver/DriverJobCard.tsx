@@ -5,7 +5,7 @@ import { StatusBadge } from '@/components/StatusBadge'
 import { GoogleMapsLink } from '@/components/GoogleMapsLink'
 import {
   formatServiceExtrasLabel,
-  formatVanCountsLabel,
+  formatBookingVehicleLabel,
   formatBookingPeopleLabel,
   formatStopsSummary,
 } from '@/utils/manualBookingExtras'
@@ -31,10 +31,8 @@ function customerName(booking: any) {
 }
 
 function vehicleText(booking: any) {
-  const vans = formatVanCountsLabel(booking.vanCounts)
-  if (vans !== '—') return vans
-  if (!booking.vehicleType) return null
-  return String(booking.vehicleType).replace(/-/g, ' ')
+  const label = formatBookingVehicleLabel(booking)
+  return label === '—' ? null : label
 }
 
 function serviceText(booking: any) {
@@ -110,7 +108,12 @@ export function DriverJobCard({
             </p>
             {(booking.pickupAddress || booking.deliveryAddress) && (
               <p className="text-xs mt-0.5 line-clamp-2">
-                {[booking.pickupAddress, booking.deliveryAddress].filter(Boolean).join(' · ')}
+                {[
+                  booking.pickupStreet || booking.pickupAddress,
+                  booking.deliveryStreet || booking.deliveryAddress,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
               </p>
             )}
           </div>

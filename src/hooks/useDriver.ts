@@ -52,14 +52,53 @@ export const useUpdateJobStatus = () => {
 export const useStartJob = () => {
   const queryClient = useQueryClient()
   return useMutation(
-    ({ id, pickupPhotos }: { id: string; pickupPhotos?: string[] }) =>
-      driverApi.startJob(id, { pickupPhotos }),
+    ({
+      id,
+      pickupPhotos,
+      lat,
+      lng,
+    }: {
+      id: string
+      pickupPhotos?: string[]
+      lat?: number
+      lng?: number
+    }) => driverApi.startJob(id, { pickupPhotos, lat, lng }),
     {
       onSuccess: (data, variables) => {
         queryClient.setQueryData(['driverJob', variables.id], data.booking)
         queryClient.invalidateQueries(['driverJob', variables.id])
         queryClient.invalidateQueries('driverJobs')
         queryClient.invalidateQueries('driverStats')
+      },
+    }
+  )
+}
+
+export const useEndJob = () => {
+  const queryClient = useQueryClient()
+  return useMutation(
+    ({ id, lat, lng }: { id: string; lat?: number; lng?: number }) =>
+      driverApi.endJob(id, { lat, lng }),
+    {
+      onSuccess: (data, variables) => {
+        queryClient.setQueryData(['driverJob', variables.id], data.booking)
+        queryClient.invalidateQueries(['driverJob', variables.id])
+        queryClient.invalidateQueries('driverJobs')
+        queryClient.invalidateQueries('driverStats')
+      },
+    }
+  )
+}
+
+export const useAddJobNote = () => {
+  const queryClient = useQueryClient()
+  return useMutation(
+    ({ id, text }: { id: string; text: string }) => driverApi.addJobNote(id, text),
+    {
+      onSuccess: (data, variables) => {
+        queryClient.setQueryData(['driverJob', variables.id], data.booking)
+        queryClient.invalidateQueries(['driverJob', variables.id])
+        queryClient.invalidateQueries('driverJobs')
       },
     }
   )
@@ -78,6 +117,8 @@ export const useAddCompletionDetails = () => {
         notes?: string
         pickupPhotos?: string[]
         dropoffPhotos?: string[]
+        lat?: number
+        lng?: number
       }
     }) => driverApi.addCompletionDetails(id, data),
     {
@@ -218,6 +259,36 @@ export const useDeleteVehicle = () => {
     {
       onSuccess: () => {
         queryClient.invalidateQueries('driverVehicles')
+      },
+    }
+  )
+}
+
+export const useDriverCalendar = (from?: string, to?: string) => {
+  return useQuery(
+    ['driverCalendar', from, to],
+    () => driverApi.getCalendar(from!, to!),
+    {
+      enabled: !!from && !!to,
+      staleTime: 30 * 1000,
+    }
+  )
+}
+
+export const useDriverWithdrawals = () => {
+  return useQuery('driverWithdrawals', driverApi.getWithdrawals, {
+    staleTime: 15 * 1000,
+  })
+}
+
+export const useRequestWithdrawal = () => {
+  const queryClient = useQueryClient()
+  return useMutation(
+    (data: { amount: number; note?: string }) => driverApi.requestWithdrawal(data),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('driverWithdrawals')
+        queryClient.invalidateQueries('driverStats')
       },
     }
   )

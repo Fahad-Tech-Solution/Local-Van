@@ -10,6 +10,8 @@ import {
   CreditCard,
   User,
   Mail,
+  Wallet,
+  Banknote,
 } from "lucide-react"
 import { useLocation } from "react-router-dom"
 import { useAuth } from "@/hooks/useAuth"
@@ -27,6 +29,10 @@ import { TeamSwitcher } from "@/components/team-switcher"
 interface MovingVanSidebarProps extends React.ComponentProps<typeof Sidebar> {
   role?: 'admin' | 'customer' | 'driver'
 }
+
+/** Flip to true to restore sidebar links without deleting them. */
+const SHOW_ADMIN_CALENDAR_NAV = false
+const SHOW_ADMIN_WITHDRAWALS_NAV = false
 
 export function MovingVanSidebar({ role = 'customer', ...props }: MovingVanSidebarProps) {
   const location = useLocation()
@@ -75,6 +81,28 @@ export function MovingVanSidebar({ role = 'customer', ...props }: MovingVanSideb
           isActive: location.pathname === "/admin/bookings",
           items: [],
         },
+        ...(SHOW_ADMIN_CALENDAR_NAV
+          ? [
+              {
+                title: "Calendar",
+                url: "/admin/calendar",
+                icon: Calendar,
+                isActive: location.pathname === "/admin/calendar",
+                items: [],
+              },
+            ]
+          : []),
+        ...(SHOW_ADMIN_WITHDRAWALS_NAV
+          ? [
+              {
+                title: "Withdrawals",
+                url: "/admin/withdrawals",
+                icon: Banknote,
+                isActive: location.pathname === "/admin/withdrawals",
+                items: [],
+              },
+            ]
+          : []),
         {
           title: "Settings",
           url: "/admin/settings",
@@ -100,6 +128,20 @@ export function MovingVanSidebar({ role = 'customer', ...props }: MovingVanSideb
           url: "/driver/available-jobs",
           icon: Briefcase,
           isActive: location.pathname === "/driver/available-jobs",
+          items: [],
+        },
+        {
+          title: "Calendar",
+          url: "/driver/calendar",
+          icon: Calendar,
+          isActive: location.pathname === "/driver/calendar",
+          items: [],
+        },
+        {
+          title: "Balance",
+          url: "/driver/balance",
+          icon: Wallet,
+          isActive: location.pathname === "/driver/balance",
           items: [],
         },
         {

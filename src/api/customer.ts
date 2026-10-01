@@ -25,4 +25,17 @@ export const customerApi = {
     const response = await apiClient.put(`/customer/bookings/${id}/amend`, data)
     return response.data
   },
+
+  signWaiver: async (
+    id: string,
+    data: {
+      signatureUrl: string
+      lat?: number
+      lng?: number
+      signedByName?: string
+    }
+  ): Promise<{ message: string; booking: any }> => {
+    const response = await apiClient.post(`/customer/bookings/${id}/waiver`, data)
+    return response.data
+  },
 }

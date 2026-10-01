@@ -17,9 +17,11 @@ import {
 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/utils/format'
 import {
-  formatVanCountsLabel,
+  formatBookingPeopleLabel,
+  formatBookingVehicleLabel,
   formatDurationLabel,
   getBookingDriversAndHelpers,
+  isHelpersRateTier,
   serviceExtrasFromBooking,
 } from '@/utils/manualBookingExtras'
 import { formatStairsDisplay, formatAccessFromAdmin } from '@/utils/stairsAccess'
@@ -36,9 +38,6 @@ import {
 } from '@/components/ui/dialog'
 import { useState, useEffect } from 'react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-
-const vehicleLabel = (value?: string) =>
-  value?.split('-').map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(' ') || '—'
 
 const serviceLabel = (value?: string) => {
   if (value === 'long-distance') return 'Long Distance'
@@ -330,23 +329,23 @@ const BookingDetails = () => {
           >
             <div className="grid gap-4 sm:grid-cols-2">
               <ReadField label="Service type" value={serviceLabel(booking.serviceType)} />
-              <ReadField
-                label="Vehicle / vans"
-                value={
-                  formatVanCountsLabel(b.vanCounts) !== '—'
-                    ? formatVanCountsLabel(b.vanCounts)
-                    : vehicleLabel(booking.vehicleType)
-                }
-              />
+              <ReadField label="Vehicle / vans" value={formatBookingVehicleLabel(b)} />
+              <ReadField label="Crew" value={formatBookingPeopleLabel(b)} />
               <ReadField label="Drivers" value={String(drivers)} />
-              <ReadField label="Helpers" value={String(helpers)} />
+              <ReadField label="Additional helpers" value={String(helpers)} />
+              {(b.helpersRateTier != null || isHelpersRateTier(b.manRequired)) && (
+                <ReadField
+                  label="Helpers rate tier"
+                  value={String(b.helpersRateTier ?? b.manRequired)}
+                />
+              )}
               <ReadField label="Dismantle items" value={String(extras.dismantleItems)} />
               <ReadField label="Assembly items" value={String(extras.assemblyItems)} />
               <ReadField label="Packing boxes" value={String(extras.packingBoxes)} />
               <ReadField label="Price" value={formatCurrency(price)} />
               {(b.durationRequired || booking.hours != null) && (
                 <ReadField
-                  label="Duration"
+                  label="Hours booked"
                   value={formatDurationLabel(b.durationRequired, booking.hours)}
                 />
               )}
@@ -375,7 +374,10 @@ const BookingDetails = () => {
             icon={<MapPin className="h-4 w-4 text-muted-foreground" />}
           >
             <div className="grid gap-4 sm:grid-cols-2">
-              <ReadField label="Address" value={booking.pickupAddress} />
+              <ReadField
+                label="Street"
+                value={b.pickupStreet || booking.pickupAddress}
+              />
               <ReadField label="City" value={booking.pickupCity} />
               <ReadField label="Postcode" value={booking.pickupZipCode} />
               <ReadField label="Date" value={formatDate(booking.pickupDate)} />
@@ -386,7 +388,7 @@ const BookingDetails = () => {
               />
             </div>
             <GoogleMapsLink
-              address={booking.pickupAddress}
+              address={b.pickupStreet || booking.pickupAddress}
               city={booking.pickupCity}
               zipCode={booking.pickupZipCode}
             />
@@ -437,7 +439,10 @@ const BookingDetails = () => {
             icon={<MapPin className="h-4 w-4 text-muted-foreground" />}
           >
             <div className="grid gap-4 sm:grid-cols-2">
-              <ReadField label="Address" value={booking.deliveryAddress} />
+              <ReadField
+                label="Street"
+                value={b.deliveryStreet || booking.deliveryAddress}
+              />
               <ReadField label="City" value={booking.deliveryCity} />
               <ReadField label="Postcode" value={booking.deliveryZipCode} />
               <ReadField
@@ -446,7 +451,7 @@ const BookingDetails = () => {
               />
             </div>
             <GoogleMapsLink
-              address={booking.deliveryAddress}
+              address={b.deliveryStreet || booking.deliveryAddress}
               city={booking.deliveryCity}
               zipCode={booking.deliveryZipCode}
             />

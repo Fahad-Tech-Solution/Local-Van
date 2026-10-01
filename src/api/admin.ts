@@ -114,23 +114,58 @@ export interface User {
   updatedAt: string
 }
 
+export interface DriverNoteEntry {
+  text: string
+  createdAt: string
+  createdBy?: User | string
+}
+
+export interface BookingWaiver {
+  signatureUrl: string
+  signedAt: string
+  lat?: number
+  lng?: number
+  signedByName?: string
+}
+
+export interface Withdrawal {
+  _id: string
+  driver: User | string
+  amount: number
+  status: 'pending' | 'approved' | 'rejected' | 'paid'
+  note?: string
+  adminNote?: string
+  processedBy?: User | string
+  processedAt?: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface Booking {
   _id: string
   customer: User | string
   driver?: User | string
   status: 'pending' | 'offered' | 'confirmed' | 'in-progress' | 'job-started' | 'completed' | 'cancelled' | 'disputed' | 'survey'
+  pickupHouseNumber?: string
+  pickupHouseName?: string
+  pickupStreet?: string
   pickupAddress: string
   pickupCity: string
   pickupState?: string
   pickupZipCode: string
   pickupDate: string
   pickupTime: string
+  deliveryHouseNumber?: string
+  deliveryHouseName?: string
+  deliveryStreet?: string
   deliveryAddress: string
   deliveryCity: string
   deliveryState?: string
   deliveryZipCode: string
   serviceType: 'local' | 'long-distance' | 'interstate'
   vehicleType: 'small' | 'medium' | 'large' | 'luton' | 'multi-van' | 'small-van' | 'medium-van' | 'large-van' | 'truck'
+  vehicleName?: string
+  vansLabel?: string
   vanCounts?: {
     small: number
     medium: number
@@ -140,7 +175,11 @@ export interface Booking {
   vans?: number
   drivers?: number
   helpers?: number
+  hours?: number
+  surveyType?: 'home' | 'video'
   stops?: {
+    houseNumber?: string
+    houseName?: string
     address: string
     city: string
     zipCode: string
@@ -159,12 +198,20 @@ export interface Booking {
   paymentMethod?: string | null
   paymentReference?: string | null
   amountPaid?: number
+  discountApplied?: boolean
+  discountCode?: string
+  discountPercent?: number
   orderCode?: string
+  externalOrderCode?: string
+  paypalInvoiceId?: string
+  paypalInvoiceUrl?: string
+  invoiceSentAt?: string
   miles?: number
   durationRequired?: string
   collectionStairs?: string
   deliveryStairs?: string
   helpersLabel?: string
+  helpersRateTier?: number
   vanSize?: string
   manRequired?: string
   men?: number
@@ -175,6 +222,18 @@ export interface Booking {
   pickupPhotos?: string[]
   dropoffPhotos?: string[]
   driverNotes?: string
+  driverNoteEntries?: DriverNoteEntry[]
+  detailsConfirmedAt?: string
+  detailsConfirmedBy?: User | string
+  feedbackCalledAt?: string
+  feedbackCalledBy?: User | string
+  jobStartedAt?: string
+  jobStartLat?: number
+  jobStartLng?: number
+  jobEndedAt?: string
+  jobEndLat?: number
+  jobEndLng?: number
+  waiver?: BookingWaiver
   additionalWorkPayment?: number
   additionalWorkDescription?: string
   notes?: {
@@ -299,8 +358,21 @@ export const adminApi = {
     page?: number
     limit?: number
     search?: string
+    pickupDate?: string
+    pickupDateFrom?: string
+    pickupDateTo?: string
   }): Promise<PaginatedResponse<Booking>> => {
     const response = await apiClient.get('/admin/bookings', { params })
+    return response.data
+  },
+
+  getBookingsCalendar: async (
+    from: string,
+    to: string
+  ): Promise<{ bookings: Booking[] }> => {
+    const response = await apiClient.get('/admin/bookings/calendar', {
+      params: { from, to },
+    })
     return response.data
   },
 
@@ -319,11 +391,15 @@ export const adminApi = {
 
   createBooking: async (data: {
     customer: { name: string; email: string; phone: string }
+    pickupHouseNumber?: string
+    pickupHouseName?: string
     pickupAddress: string
     pickupCity: string
     pickupZipCode: string
     pickupDate: string
     pickupTime: string
+    deliveryHouseNumber?: string
+    deliveryHouseName?: string
     deliveryAddress: string
     deliveryCity: string
     deliveryZipCode: string
@@ -337,7 +413,10 @@ export const adminApi = {
     }
     helpers?: number
     drivers?: number
+    hours?: number
     stops?: {
+      houseNumber?: string
+      houseName?: string
       address: string
       city: string
       zipCode: string
@@ -355,12 +434,14 @@ export const adminApi = {
     paymentReference?: string
     specialInstructions?: string
     sendConfirmationEmail?: boolean
+    sendPaymentLink?: boolean
     pickupAccess?: 'lift' | 'stairs' | 'ground'
     pickupStairsCount?: number
     deliveryAccess?: 'lift' | 'stairs' | 'ground'
     deliveryStairsCount?: number
     men?: number
     status?: 'pending' | 'survey'
+    surveyType?: 'home' | 'video'
   }): Promise<{
     message: string
     booking: Booking
@@ -391,6 +472,13 @@ export const adminApi = {
 
   sendEmailReminder: async (id: string, type: 'customer' | 'driver'): Promise<{ message: string; booking: Booking }> => {
     const response = await apiClient.post(`/admin/bookings/${id}/send-reminder`, { type })
+    return response.data
+  },
+
+  sendInvoiceLink: async (
+    id: string
+  ): Promise<{ message: string; booking: Booking; invoiceUrl?: string }> => {
+    const response = await apiClient.post(`/admin/bookings/${id}/send-invoice`)
     return response.data
   },
 
@@ -445,6 +533,21 @@ export const adminApi = {
 
   markAllNotificationsRead: async (): Promise<{ message: string }> => {
     const response = await apiClient.post('/admin/notifications/read-all')
+    return response.data
+  },
+
+  listWithdrawals: async (params?: {
+    status?: string
+  }): Promise<{ withdrawals: Withdrawal[] }> => {
+    const response = await apiClient.get('/admin/withdrawals', { params })
+    return response.data
+  },
+
+  processWithdrawal: async (
+    id: string,
+    data: { status: 'approved' | 'rejected' | 'paid'; adminNote?: string }
+  ): Promise<{ message: string; withdrawal: Withdrawal }> => {
+    const response = await apiClient.post(`/admin/withdrawals/${id}/process`, data)
     return response.data
   },
 }

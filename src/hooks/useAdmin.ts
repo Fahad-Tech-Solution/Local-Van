@@ -173,12 +173,56 @@ export const useAdminBookings = (params?: {
   page?: number
   limit?: number
   search?: string
+  pickupDate?: string
+  pickupDateFrom?: string
+  pickupDateTo?: string
 }) => {
   return useQuery(
     ['adminBookings', params],
     () => adminApi.getAllBookings(params),
     {
       staleTime: 10 * 1000,
+    }
+  )
+}
+
+export const useAdminBookingsCalendar = (from?: string, to?: string) => {
+  return useQuery(
+    ['adminBookingsCalendar', from, to],
+    () => adminApi.getBookingsCalendar(from!, to!),
+    {
+      enabled: !!from && !!to,
+      staleTime: 30 * 1000,
+    }
+  )
+}
+
+export const useAdminWithdrawals = (params?: { status?: string }) => {
+  return useQuery(
+    ['adminWithdrawals', params],
+    () => adminApi.listWithdrawals(params),
+    {
+      staleTime: 15 * 1000,
+    }
+  )
+}
+
+export const useProcessWithdrawal = () => {
+  const queryClient = useQueryClient()
+  return useMutation(
+    ({
+      id,
+      status,
+      adminNote,
+    }: {
+      id: string
+      status: 'approved' | 'rejected' | 'paid'
+      adminNote?: string
+    }) => adminApi.processWithdrawal(id, { status, adminNote }),
+    {
+      onSuccess: () => {
+        queryClient.invalidateQueries('adminWithdrawals')
+      },
     }
   )
 }
@@ -272,6 +316,16 @@ export const useSendEmailReminder = () => {
       },
     }
   )
+}
+
+export const useSendInvoiceLink = () => {
+  const queryClient = useQueryClient()
+  return useMutation((id: string) => adminApi.sendInvoiceLink(id), {
+    onSuccess: () => {
+      queryClient.invalidateQueries('adminBookings')
+      queryClient.invalidateQueries('adminStats')
+    },
+  })
 }
 
 export const useOfferJobToDrivers = () => {

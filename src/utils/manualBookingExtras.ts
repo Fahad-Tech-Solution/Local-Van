@@ -83,21 +83,102 @@ export function formatServiceExtrasLabel(extras?: Partial<ServiceExtrasForm> | n
   return parts.length ? parts.join('; ') : 'None'
 }
 
-/** People line for driver/admin read views — prefers website helpersLabel when present. */
+/** `manRequired` / helpersRateTier are pricing tiers 1–3, not a headcount. */
+export function isHelpersRateTier(value: unknown): boolean {
+  return /^[123]$/.test(String(value ?? '').trim())
+}
+
+const VEHICLE_DISPLAY_NAMES: Record<string, string> = {
+  small: 'Small Van',
+  medium: 'Medium Van',
+  large: 'Large Van',
+  luton: 'Luton Van',
+  'small-van': 'Small Van',
+  'medium-van': 'Medium Van',
+  'large-van': 'Large Van',
+  truck: 'Luton Van',
+  'multi-van': 'Multi Van',
+}
+
+/**
+ * Vehicle line for read views.
+ * Luton is never shown as Large or as a generic truck.
+ * Multi-van fleets use the exact qty label.
+ */
+export function formatBookingVehicleLabel(booking: any): string {
+  if (!booking) return '—'
+
+  const counts = booking.vanCounts
+  const small = Number(counts?.small) || 0
+  const medium = Number(counts?.medium) || 0
+  const large = Number(counts?.large) || 0
+  const luton = Number(counts?.luton) || 0
+  const total = small + medium + large + luton
+  const mixedFleet = total > 1 || (luton > 0 && (large > 0 || medium > 0 || small > 0))
+
+  if (mixedFleet) {
+    const vansLabel = String(booking.vansLabel || '').trim()
+    if (vansLabel) return vansLabel
+    const formatted = formatVanCountsLabel(counts)
+    if (formatted !== '—') return formatted
+  }
+
+  const vanSize = String(booking.vanSize || '').toLowerCase()
+  const vehicleType = String(booking.vehicleType || '')
+  const singleLuton =
+    (luton > 0 && large === 0 && medium === 0 && small === 0) ||
+    ((vanSize === 'luton' || vehicleType === 'luton' || vehicleType === 'truck') &&
+      large === 0 &&
+      total <= 1)
+
+  const name = String(booking.vehicleName || '').trim()
+  if (singleLuton) {
+    if (name && /luton/i.test(name)) return name
+    return 'Luton Van'
+  }
+
+  if (name) {
+    if (
+      /large/i.test(name) &&
+      (vanSize === 'luton' || vehicleType === 'truck' || vehicleType === 'luton' || luton > 0)
+    ) {
+      return 'Luton Van'
+    }
+    return name
+  }
+
+  const vansLabel = String(booking.vansLabel || '').trim()
+  if (vansLabel) return vansLabel
+
+  if (vanSize && VEHICLE_DISPLAY_NAMES[vanSize]) return VEHICLE_DISPLAY_NAMES[vanSize]
+  if (vehicleType && VEHICLE_DISPLAY_NAMES[vehicleType]) return VEHICLE_DISPLAY_NAMES[vehicleType]
+
+  const formatted = formatVanCountsLabel(counts)
+  if (formatted !== '—') return formatted
+  return '—'
+}
+
+/** People line for driver/admin read views. Crew size is drivers + additional helpers. */
 export function formatBookingPeopleLabel(booking: any): string {
   if (!booking) return '—'
   const { drivers, helpers } = getBookingDriversAndHelpers(booking)
+  const label = String(booking.helpersLabel || '').trim()
+
   if (drivers > 0 || helpers > 0) {
-    return `${drivers} driver${drivers === 1 ? '' : 's'}${
-      helpers > 0 ? ` + ${helpers} helper${helpers === 1 ? '' : 's'}` : ''
-    }`
+    if (label) return label
+    const driverPart = `${drivers} driver${drivers === 1 ? '' : 's'}`
+    const helperPart =
+      helpers > 0
+        ? ` + ${helpers} additional ${helpers === 1 ? 'person' : 'people'}`
+        : ''
+    return `${driverPart}${helperPart}`
   }
-  if (booking.helpersLabel && String(booking.helpersLabel).trim()) {
-    return String(booking.helpersLabel).trim()
-  }
-  if (booking.manRequired && String(booking.manRequired).trim()) {
-    return String(booking.manRequired).trim()
-  }
+
+  if (label) return label
+
+  const manRequired = String(booking.manRequired || '').trim()
+  if (manRequired && !isHelpersRateTier(manRequired)) return manRequired
+
   const men = Number(booking.men)
   if (!Number.isNaN(men) && men > 0) {
     return men === 1 ? '1 person' : `${men} people`
@@ -181,18 +262,40 @@ export function formatStopsSummary(stops?: any[] | null): string | null {
   return `${stops.length} stop${stops.length === 1 ? '' : 's'}`
 }
 
+const LEGACY_VAN_SIZE: Record<string, keyof VanCounts> = {
+  small: 'small',
+  medium: 'medium',
+  large: 'large',
+  luton: 'luton',
+  'small-van': 'small',
+  'medium-van': 'medium',
+  'large-van': 'large',
+  truck: 'luton',
+}
+
 export function vanCountsFromBooking(booking: any): VanCounts {
   if (booking?.vanCounts) {
-    return {
+    const counts = {
       small: Number(booking.vanCounts.small) || 0,
       medium: Number(booking.vanCounts.medium) || 0,
       large: Number(booking.vanCounts.large) || 0,
       luton: Number(booking.vanCounts.luton) || 0,
     }
+    if (counts.small + counts.medium + counts.large + counts.luton > 0) {
+      return counts
+    }
   }
-  const type = booking?.vehicleType
-  if (type === 'small' || type === 'medium' || type === 'large' || type === 'luton') {
-    return { small: 0, medium: 0, large: 0, luton: 0, [type]: Math.max(1, Number(booking?.vans) || 1) }
+  const sizeKey = LEGACY_VAN_SIZE[String(booking?.vanSize || '').toLowerCase()]
+  const typeKey = LEGACY_VAN_SIZE[String(booking?.vehicleType || '')]
+  const key = sizeKey || typeKey
+  if (key) {
+    return {
+      small: 0,
+      medium: 0,
+      large: 0,
+      luton: 0,
+      [key]: Math.max(1, Number(booking?.vans) || 1),
+    }
   }
   return emptyVanCounts()
 }

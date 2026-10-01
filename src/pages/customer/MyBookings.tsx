@@ -6,17 +6,9 @@ import { useBookings } from '@/hooks/useBookings'
 import { FileText, Calendar, Clock, MapPin, Truck, Loader2 } from 'lucide-react'
 import { Booking } from '@/api/bookings'
 import { formatCurrency, formatDate } from '@/utils/format'
-import { formatVanCountsLabel } from '@/utils/manualBookingExtras'
+import { formatBookingVehicleLabel } from '@/utils/manualBookingExtras'
 
-const vehicleLabel = (booking: any) => {
-  const vans = formatVanCountsLabel(booking.vanCounts)
-  if (vans !== '—') return vans
-  if (!booking.vehicleType) return '—'
-  return String(booking.vehicleType)
-    .split('-')
-    .map((p: string) => p.charAt(0).toUpperCase() + p.slice(1))
-    .join(' ')
-}
+const vehicleLabel = (booking: any) => formatBookingVehicleLabel(booking)
 
 const serviceLabel = (value?: string) => {
   if (value === 'long-distance') return 'Long Distance'

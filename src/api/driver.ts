@@ -1,6 +1,12 @@
 import { apiClient } from './client'
 import { Booking } from './admin'
 
+export interface DriverBalance {
+  current: number
+  inReview: number
+  available: number
+}
+
 export interface DriverStats {
   totalJobs: number
   activeJobs: number
@@ -8,6 +14,7 @@ export interface DriverStats {
   pendingJobs: number
   offeredJobs?: number
   totalEarnings?: number
+  balance?: DriverBalance
   recentEarnings?: {
     _id: string
     orderCode?: string
@@ -18,6 +25,18 @@ export interface DriverStats {
     completedAt?: string
     paymentStatus?: string
   }[]
+}
+
+export interface WithdrawalRequest {
+  _id: string
+  driver?: string
+  amount: number
+  status: 'pending' | 'approved' | 'rejected' | 'paid'
+  note?: string
+  adminNote?: string
+  processedAt?: string
+  createdAt: string
+  updatedAt: string
 }
 
 export interface VehicleInfo {
@@ -118,9 +137,25 @@ export const driverApi = {
 
   startJob: async (
     id: string,
-    data?: { pickupPhotos?: string[] }
+    data?: { pickupPhotos?: string[]; lat?: number; lng?: number }
   ): Promise<{ message: string; booking: Booking }> => {
     const response = await apiClient.post(`/driver/jobs/${id}/start`, data || {})
+    return response.data
+  },
+
+  endJob: async (
+    id: string,
+    data?: { lat?: number; lng?: number }
+  ): Promise<{ message: string; booking: Booking }> => {
+    const response = await apiClient.post(`/driver/jobs/${id}/end`, data || {})
+    return response.data
+  },
+
+  addJobNote: async (
+    id: string,
+    text: string
+  ): Promise<{ message: string; booking: Booking }> => {
+    const response = await apiClient.post(`/driver/jobs/${id}/notes`, { text })
     return response.data
   },
 
@@ -131,9 +166,34 @@ export const driverApi = {
       notes?: string
       pickupPhotos?: string[]
       dropoffPhotos?: string[]
+      lat?: number
+      lng?: number
     }
   ): Promise<{ message: string; booking: Booking }> => {
     const response = await apiClient.post(`/driver/jobs/${id}/complete`, data)
+    return response.data
+  },
+
+  getCalendar: async (
+    from: string,
+    to: string
+  ): Promise<{ bookings: Booking[] }> => {
+    const response = await apiClient.get('/driver/calendar', {
+      params: { from, to },
+    })
+    return response.data
+  },
+
+  getWithdrawals: async (): Promise<{ withdrawals: WithdrawalRequest[] }> => {
+    const response = await apiClient.get('/driver/withdrawals')
+    return response.data
+  },
+
+  requestWithdrawal: async (data: {
+    amount: number
+    note?: string
+  }): Promise<{ message: string; withdrawal: WithdrawalRequest }> => {
+    const response = await apiClient.post('/driver/withdrawals', data)
     return response.data
   },
 

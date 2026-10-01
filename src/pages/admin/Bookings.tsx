@@ -6,8 +6,9 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Textarea } from '@/components/ui/textarea'
-import { Search, Loader2, Edit, Truck, Mail, AlertCircle, PoundSterling, MessageSquare, Users, CheckCircle2, XCircle, Plus, RefreshCcw, Eye, MapPin, Package, Trash2 } from 'lucide-react'
-import { formatCurrency, formatDate } from '@/utils/format'
+import { Search, Loader2, Edit, Truck, Mail, AlertCircle, PoundSterling, MessageSquare, Users, CheckCircle2, XCircle, Plus, RefreshCcw, Eye, MapPin, Package, Trash2, MessageCircle, CalendarDays } from 'lucide-react'
+import { formatCurrency, formatDate, formatDateTime } from '@/utils/format'
+import { formatFullAddress } from '@/utils/addressFormat'
 import {
   formatAccessFromAdmin,
   formatStairsDisplay,
@@ -21,8 +22,11 @@ import {
   emptyServiceExtras,
   emptyStop,
   emptyVanCounts,
+  formatBookingPeopleLabel,
+  formatBookingVehicleLabel,
+  formatDurationLabel,
   formatServiceExtrasLabel,
-  formatVanCountsLabel,
+  isHelpersRateTier,
   serviceExtrasFromBooking,
   stopsFromBooking,
   suggestedExtrasTotal,
@@ -40,6 +44,7 @@ import {
   useAdminDrivers, 
   useHandleDispute, 
   useSendEmailReminder,
+  useSendInvoiceLink,
   useOfferJobToDrivers,
   useAddBookingNote,
   useRecordAdditionalWorkPayment,
@@ -63,6 +68,11 @@ import {
 import { Checkbox } from '@/components/ui/checkbox'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Separator } from '@/components/ui/separator'
+
+/** Flip to true to restore Today / date pickup filters without deleting them. */
+const SHOW_BOOKINGS_DATE_FILTER = false
+/** Flip to true to restore house number / house name inputs in create & edit forms. */
+const SHOW_HOUSE_NUMBER_NAME_FIELDS = false
 
 const VAN_SIZE_FIELDS = [
   { key: 'small' as const, label: 'Small' },
@@ -124,14 +134,6 @@ function ClearableNumberInput({
   )
 }
 
-const VEHICLE_TYPE_OPTIONS = [
-  { value: 'small', label: 'Small' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'large', label: 'Large' },
-  { value: 'luton', label: 'Luton' },
-  { value: 'multi-van', label: 'Multi Van' },
-] as const
-
 const PICKUP_TIME_OPTIONS = [
   '6am-7am',
   '7am-8am',
@@ -155,20 +157,6 @@ const formatPeopleRequired = (men?: number): string | undefined => {
   return men === 1 ? '1 person' : `${men} people`
 }
 
-const formatPeopleSplit = (drivers?: number, helpers?: number, men?: number) => {
-  if (drivers != null || helpers != null) {
-    const d = Number(drivers) || 0
-    const h = Number(helpers) || 0
-    return `${d} driver${d === 1 ? '' : 's'}${h > 0 ? ` + ${h} helper${h === 1 ? '' : 's'}` : ''} (${d + h} total)`
-  }
-  return formatPeopleRequired(men) || '—'
-}
-
-const vehicleLabel = (value?: string) =>
-  VEHICLE_TYPE_OPTIONS.find((o) => o.value === value)?.label ||
-  value?.split('-').map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(' ') ||
-  '—'
-
 const serviceLabel = (value?: string) => {
   if (value === 'long-distance') return 'Long Distance'
   if (value === 'interstate') return 'Interstate'
@@ -181,6 +169,7 @@ const paymentMethodLabel = (value?: string) => {
     'bank-transfer': 'Bank Transfer',
     cash: 'Cash',
     card: 'Card',
+    paypal: 'PayPal',
     other: 'Other',
   }
   return value ? map[value] || value : '—'
@@ -215,17 +204,22 @@ const ReadField = ({ label, value }: { label: string; value?: ReactNode }) => (
 
 const emptyManualOrder = () => ({
   customer: { name: '', email: '', phone: '' },
+  pickupHouseNumber: '',
+  pickupHouseName: '',
   pickupAddress: '',
   pickupCity: '',
   pickupZipCode: '',
   pickupDate: '',
   pickupTime: '',
+  deliveryHouseNumber: '',
+  deliveryHouseName: '',
   deliveryAddress: '',
   deliveryCity: '',
   deliveryZipCode: '',
   serviceType: 'local' as 'local' | 'long-distance' | 'interstate',
   vanCounts: emptyVanCounts(),
   helpers: 0,
+  hours: 2,
   stops: [] as BookingStopForm[],
   serviceExtras: emptyServiceExtras(),
   pickupAccess: 'ground' as 'lift' | 'stairs' | 'ground',
@@ -238,13 +232,50 @@ const emptyManualOrder = () => ({
   paymentReference: '',
   specialInstructions: '',
   sendConfirmationEmail: true,
+  sendPaymentLink: false,
   status: 'pending' as 'pending' | 'survey',
+  surveyType: 'home' as 'home' | 'video',
 })
+
+const buildSmsBody = (booking: any) => {
+  const pickup = formatFullAddress({
+    houseName: booking.pickupHouseName,
+    houseNumber: booking.pickupHouseNumber,
+    address: booking.pickupAddress,
+    city: booking.pickupCity,
+    zipCode: booking.pickupZipCode,
+  })
+  const delivery = formatFullAddress({
+    houseName: booking.deliveryHouseName,
+    houseNumber: booking.deliveryHouseNumber,
+    address: booking.deliveryAddress,
+    city: booking.deliveryCity,
+    zipCode: booking.deliveryZipCode,
+  })
+  const duration = formatDurationLabel(booking.durationRequired, booking.hours)
+  const lines = [
+    `Local Van job ${booking.orderCode ? `#${booking.orderCode}` : ''}`.trim(),
+    `Date: ${formatDate(booking.pickupDate)} ${booking.pickupTime || ''}`.trim(),
+    `Duration: ${duration}`,
+    `Pickup: ${pickup || '—'}`,
+    `Drop-off: ${delivery || '—'}`,
+    `Price: ${formatCurrency(booking.finalPrice || booking.estimatedPrice || 0)}`,
+  ]
+  return lines.join('\n')
+}
+
+const openCustomerSms = (booking: any) => {
+  const phone = String(booking.contactPhone || '').replace(/\s+/g, '')
+  if (!phone) return
+  const body = encodeURIComponent(buildSmsBody(booking))
+  window.location.href = `sms:${phone}?body=${body}`
+}
 
 const BookingsPage = () => {
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [pickupDateFilter, setPickupDateFilter] = useState<string>('')
   const [editingBooking, setEditingBooking] = useState<any>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
@@ -270,6 +301,7 @@ const BookingsPage = () => {
     limit: 10,
     search: search || undefined,
     status: statusFilter === 'all' ? undefined : statusFilter,
+    pickupDate: pickupDateFilter || undefined,
   })
 
   const { data: driversData } = useAdminDrivers({ limit: 100 })
@@ -280,6 +312,7 @@ const BookingsPage = () => {
   const reclaimBookingMutation = useReclaimBooking()
   const handleDisputeMutation = useHandleDispute()
   const sendReminderMutation = useSendEmailReminder()
+  const sendInvoiceMutation = useSendInvoiceLink()
   const offerJobMutation = useOfferJobToDrivers()
   const addNoteMutation = useAddBookingNote()
   const recordPaymentMutation = useRecordAdditionalWorkPayment()
@@ -298,18 +331,36 @@ const BookingsPage = () => {
     const delivery = parseStairsAccess(booking.deliveryStairs)
     const vanCounts = vanCountsFromBooking(booking)
     const drivers = totalVans(vanCounts)
+    const hoursFromBooking =
+      booking.hours != null && booking.hours !== '' && Number.isFinite(Number(booking.hours))
+        ? Number(booking.hours)
+        : (() => {
+            const raw = String(booking.durationRequired || '').trim()
+            if (!raw) return ''
+            const parsed = Number(raw.replace(/[^\d.]/g, ''))
+            return Number.isFinite(parsed) && parsed >= 1 ? parsed : ''
+          })()
     setEditingBooking({
       ...booking,
       pickupDate: booking.pickupDate
         ? new Date(booking.pickupDate).toISOString().split('T')[0]
         : '',
+      pickupHouseNumber: booking.pickupHouseNumber || '',
+      pickupHouseName: booking.pickupHouseName || '',
+      deliveryHouseNumber: booking.deliveryHouseNumber || '',
+      deliveryHouseName: booking.deliveryHouseName || '',
+      hours: hoursFromBooking,
+      surveyType: booking.surveyType || 'home',
       pickupAccess: pickup.access,
       pickupStairsCount: pickup.stairsCount,
       deliveryAccess: delivery.access,
       deliveryStairsCount: delivery.stairsCount,
       vanCounts,
       drivers,
-      helpers: Number(booking.helpers) || Math.max(0, (Number(booking.men) || drivers) - drivers),
+      helpers:
+        booking.helpers != null && booking.helpers !== ''
+          ? Math.max(0, Number(booking.helpers) || 0)
+          : Math.max(0, (Number(booking.men) || drivers) - drivers),
       stops: stopsFromBooking(booking),
       serviceExtras: serviceExtrasFromBooking(booking),
       men: drivers + (Number(booking.helpers) || 0),
@@ -352,8 +403,14 @@ const BookingsPage = () => {
         id: editingBooking._id,
         data: {
           status: editingBooking.status,
+          surveyType:
+            editingBooking.status === 'survey'
+              ? editingBooking.surveyType || 'home'
+              : undefined,
           finalPrice: price,
           estimatedPrice: price,
+          pickupHouseNumber: editingBooking.pickupHouseNumber || undefined,
+          pickupHouseName: editingBooking.pickupHouseName || undefined,
           pickupAddress: editingBooking.pickupAddress,
           pickupCity: editingBooking.pickupCity,
           pickupZipCode: editingBooking.pickupZipCode,
@@ -361,6 +418,8 @@ const BookingsPage = () => {
             ? new Date(editingBooking.pickupDate).toISOString()
             : editingBooking.pickupDate,
           pickupTime: editingBooking.pickupTime,
+          deliveryHouseNumber: editingBooking.deliveryHouseNumber || undefined,
+          deliveryHouseName: editingBooking.deliveryHouseName || undefined,
           deliveryAddress: editingBooking.deliveryAddress,
           deliveryCity: editingBooking.deliveryCity,
           deliveryZipCode: editingBooking.deliveryZipCode,
@@ -370,6 +429,10 @@ const BookingsPage = () => {
           vanCounts,
           helpers,
           drivers,
+          hours:
+            editingBooking.hours !== '' && editingBooking.hours != null
+              ? Number(editingBooking.hours)
+              : undefined,
           stops: editingBooking.stops || [],
           serviceExtras: extras,
           paymentStatus: editingBooking.paymentStatus,
@@ -468,6 +531,7 @@ const BookingsPage = () => {
         (stop.access !== 'stairs' || stop.stairsCount >= 1)
     )
     const packingOk = order.serviceExtras.packingBoxes % 5 === 0
+    const surveyOk = order.status !== 'survey' || !!order.surveyType
     return (
       hasCustomer &&
       hasAddresses &&
@@ -476,12 +540,18 @@ const BookingsPage = () => {
       vansTotal >= 1 &&
       hasAccess &&
       stopsOk &&
-      packingOk
+      packingOk &&
+      surveyOk
     )
   }
 
   const handleCreateManualOrder = async () => {
     if (!isManualOrderValid()) return
+    if (newManualOrder.status === 'survey' && !newManualOrder.surveyType) {
+      setErrorMessage('Survey type is required for survey bookings')
+      setTimeout(() => setErrorMessage(''), 3000)
+      return
+    }
     try {
       const vansTotal = totalVans(newManualOrder.vanCounts)
       const helpers = Math.max(0, Number(newManualOrder.helpers) || 0)
@@ -491,11 +561,15 @@ const BookingsPage = () => {
           email: newManualOrder.customer.email.trim(),
           phone: newManualOrder.customer.phone.trim(),
         },
+        pickupHouseNumber: newManualOrder.pickupHouseNumber.trim() || undefined,
+        pickupHouseName: newManualOrder.pickupHouseName.trim() || undefined,
         pickupAddress: newManualOrder.pickupAddress.trim(),
         pickupCity: newManualOrder.pickupCity.trim(),
         pickupZipCode: newManualOrder.pickupZipCode.trim(),
         pickupDate: new Date(newManualOrder.pickupDate).toISOString(),
         pickupTime: newManualOrder.pickupTime,
+        deliveryHouseNumber: newManualOrder.deliveryHouseNumber.trim() || undefined,
+        deliveryHouseName: newManualOrder.deliveryHouseName.trim() || undefined,
         deliveryAddress: newManualOrder.deliveryAddress.trim(),
         deliveryCity: newManualOrder.deliveryCity.trim(),
         deliveryZipCode: newManualOrder.deliveryZipCode.trim(),
@@ -503,6 +577,7 @@ const BookingsPage = () => {
         vanCounts: newManualOrder.vanCounts,
         helpers,
         drivers: vansTotal,
+        hours: Number(newManualOrder.hours) || undefined,
         stops: newManualOrder.stops,
         serviceExtras: newManualOrder.serviceExtras,
         price: newManualOrder.price,
@@ -512,6 +587,7 @@ const BookingsPage = () => {
         paymentReference: newManualOrder.paymentReference.trim() || undefined,
         specialInstructions: newManualOrder.specialInstructions.trim() || undefined,
         sendConfirmationEmail: newManualOrder.sendConfirmationEmail,
+        sendPaymentLink: newManualOrder.sendPaymentLink,
         pickupAccess: newManualOrder.pickupAccess,
         pickupStairsCount:
           newManualOrder.pickupAccess === 'stairs' ? newManualOrder.pickupStairsCount : undefined,
@@ -520,6 +596,7 @@ const BookingsPage = () => {
           newManualOrder.deliveryAccess === 'stairs' ? newManualOrder.deliveryStairsCount : undefined,
         men: vansTotal + helpers,
         status: newManualOrder.status,
+        surveyType: newManualOrder.status === 'survey' ? newManualOrder.surveyType : undefined,
       })
 
       setIsCreateDialogOpen(false)
@@ -666,6 +743,53 @@ const BookingsPage = () => {
     }
   }
 
+  const handleSendInvoice = async (booking: any) => {
+    const amount =
+      (booking.finalPrice || booking.estimatedPrice || 0) +
+      (booking.additionalWorkPayment || 0)
+    const confirmed = window.confirm(
+      `Send a PayPal invoice (${formatCurrency(amount)}) to ${booking.contactEmail || 'the customer'}?`
+    )
+    if (!confirmed) return
+
+    try {
+      const result = await sendInvoiceMutation.mutateAsync(booking._id)
+      setSuccessMessage(
+        result.invoiceUrl
+          ? `${result.message}. Link: ${result.invoiceUrl}`
+          : result.message || 'Invoice sent'
+      )
+      setTimeout(() => setSuccessMessage(''), 8000)
+      if (viewingBooking?._id === booking._id && result.booking) {
+        setViewingBooking(result.booking)
+      }
+      refetch()
+    } catch (error: any) {
+      const data = error.response?.data
+      if (data?.invoiceUrl) {
+        setErrorMessage(
+          `${data.message || 'Email failed'}. Invoice URL: ${data.invoiceUrl}`
+        )
+        refetch()
+      } else {
+        setErrorMessage(data?.message || 'Failed to send invoice')
+      }
+      setTimeout(() => setErrorMessage(''), 8000)
+    }
+  }
+
+  const handleSendReminder = async (bookingId: string, type: 'customer' | 'driver') => {
+    try {
+      const result = await sendReminderMutation.mutateAsync({ id: bookingId, type })
+      setSuccessMessage(result.message || `${type === 'customer' ? 'Customer' : 'Driver'} reminder sent`)
+      setTimeout(() => setSuccessMessage(''), 4000)
+      refetch()
+    } catch (error: any) {
+      setErrorMessage(error.response?.data?.message || `Failed to send ${type} reminder`)
+      setTimeout(() => setErrorMessage(''), 4000)
+    }
+  }
+
   return (
     <DashboardLayout role="admin">
       <div className="space-y-6">
@@ -702,8 +826,8 @@ const BookingsPage = () => {
             <CardDescription>Search and filter bookings</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col gap-3 mb-4 md:flex-row md:gap-4">
-              <div className="flex-1 relative min-w-0 w-full">
+            <div className="flex flex-col gap-3 mb-4 md:flex-row md:gap-4 md:flex-wrap">
+              <div className="flex-1 relative min-w-0 w-full md:min-w-[220px]">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search by name, email, or order code..."
@@ -735,6 +859,46 @@ const BookingsPage = () => {
                   <SelectItem value="survey">Survey</SelectItem>
                 </SelectContent>
               </Select>
+              {SHOW_BOOKINGS_DATE_FILTER && (
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant={pickupDateFilter === 'today' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => {
+                    setPickupDateFilter((prev) => (prev === 'today' ? '' : 'today'))
+                    setPage(1)
+                  }}
+                >
+                  <CalendarDays className="h-4 w-4 mr-1" />
+                  Today
+                </Button>
+                <Input
+                  type="date"
+                  className="w-full sm:w-[170px]"
+                  value={
+                    pickupDateFilter && pickupDateFilter !== 'today' ? pickupDateFilter : ''
+                  }
+                  onChange={(e) => {
+                    setPickupDateFilter(e.target.value)
+                    setPage(1)
+                  }}
+                />
+                {pickupDateFilter && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setPickupDateFilter('')
+                      setPage(1)
+                    }}
+                  >
+                    Clear date
+                  </Button>
+                )}
+              </div>
+              )}
             </div>
 
             {isLoading ? (
@@ -763,6 +927,18 @@ const BookingsPage = () => {
                                 {booking.orderCode && (
                                   <Badge variant="outline">#{booking.orderCode}</Badge>
                                 )}
+                                {booking.detailsConfirmedAt && (
+                                  <Badge variant="secondary" className="gap-1">
+                                    <CheckCircle2 className="h-3 w-3" />
+                                    Details OK
+                                  </Badge>
+                                )}
+                                {booking.feedbackCalledAt && (
+                                  <Badge variant="secondary" className="gap-1">
+                                    <CheckCircle2 className="h-3 w-3" />
+                                    Feedback
+                                  </Badge>
+                                )}
                                 {booking.isDisputed && (
                                   <Badge variant="destructive">Disputed</Badge>
                                 )}
@@ -777,27 +953,43 @@ const BookingsPage = () => {
                                 <div className="space-y-1">
                                   <p>
                                     <strong className="text-muted-foreground">Pickup:</strong>{' '}
-                                    {booking.pickupAddress}, {booking.pickupCity}{' '}
-                                    {booking.pickupZipCode}
+                                    {formatFullAddress({
+                                      houseName: booking.pickupHouseName,
+                                      houseNumber: booking.pickupHouseNumber,
+                                      address: booking.pickupStreet || booking.pickupAddress,
+                                      city: booking.pickupCity,
+                                      zipCode: booking.pickupZipCode,
+                                    }) || '—'}
                                   </p>
                                   <p>
                                     <strong className="text-muted-foreground">Delivery:</strong>{' '}
-                                    {booking.deliveryAddress}, {booking.deliveryCity}{' '}
-                                    {booking.deliveryZipCode}
+                                    {formatFullAddress({
+                                      houseName: booking.deliveryHouseName,
+                                      houseNumber: booking.deliveryHouseNumber,
+                                      address: booking.deliveryStreet || booking.deliveryAddress,
+                                      city: booking.deliveryCity,
+                                      zipCode: booking.deliveryZipCode,
+                                    }) || '—'}
                                   </p>
                                   <p>
                                     <strong className="text-muted-foreground">Date & Time:</strong>{' '}
                                     {formatDate(booking.pickupDate)} · {booking.pickupTime}
                                   </p>
                                   <p>
+                                    <strong className="text-muted-foreground">Hours booked:</strong>{' '}
+                                    {formatDurationLabel(booking.durationRequired, booking.hours)}
+                                  </p>
+                                  <p>
+                                    <strong className="text-muted-foreground">Booked on:</strong>{' '}
+                                    {formatDateTime(booking.createdAt) || '—'}
+                                  </p>
+                                  <p>
                                     <strong className="text-muted-foreground">Vans:</strong>{' '}
-                                    {formatVanCountsLabel(booking.vanCounts) !== '—'
-                                      ? formatVanCountsLabel(booking.vanCounts)
-                                      : vehicleLabel(booking.vehicleType)}
+                                    {formatBookingVehicleLabel(booking)}
                                   </p>
                                   <p>
                                     <strong className="text-muted-foreground">People:</strong>{' '}
-                                    {formatPeopleSplit(booking.drivers, booking.helpers, booking.men)}
+                                    {formatBookingPeopleLabel(booking)}
                                   </p>
                                   {(booking.collectionStairs || booking.deliveryStairs) && (
                                     <>
@@ -833,6 +1025,15 @@ const BookingsPage = () => {
                                       ? `(Base: ${formatCurrency(basePrice)})`
                                       : null}
                                   </p>
+                                  {booking.discountApplied && (
+                                    <p>
+                                      <strong className="text-muted-foreground">Discount:</strong>{' '}
+                                      {booking.discountCode || '—'}
+                                      {booking.discountPercent
+                                        ? ` (${booking.discountPercent}% off)`
+                                        : ''}
+                                    </p>
+                                  )}
                                   {booking.additionalWorkPayment ? (
                                     <p>
                                       <strong className="text-muted-foreground">Additional:</strong>{' '}
@@ -985,27 +1186,49 @@ const BookingsPage = () => {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => {
-                                  sendReminderMutation.mutate({ id: booking._id, type: 'customer' })
-                                }}
+                                onClick={() => openCustomerSms(booking)}
+                                disabled={!booking.contactPhone}
+                                title="Open device SMS with job summary"
+                              >
+                                <MessageCircle className="h-4 w-4 mr-1" />
+                                Text customer
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleSendReminder(booking._id, 'customer')}
                                 disabled={sendReminderMutation.isLoading}
                                 title="Send email reminder to customer"
                               >
                                 <Mail className="h-4 w-4 mr-1" />
-                                Customer
+                                Email customer
                               </Button>
+                              {booking.paymentStatus === 'pending' && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleSendInvoice(booking)}
+                                  disabled={sendInvoiceMutation.isLoading}
+                                  title="Create PayPal invoice and email pay link"
+                                >
+                                  {sendInvoiceMutation.isLoading ? (
+                                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                  ) : (
+                                    <PoundSterling className="h-4 w-4 mr-1" />
+                                  )}
+                                  {booking.paypalInvoiceUrl ? 'Resend invoice' : 'Send invoice'}
+                                </Button>
+                              )}
                               {driver && (
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => {
-                                    sendReminderMutation.mutate({ id: booking._id, type: 'driver' })
-                                  }}
+                                  onClick={() => handleSendReminder(booking._id, 'driver')}
                                   disabled={sendReminderMutation.isLoading}
                                   title="Send email reminder to driver"
                                 >
                                   <Mail className="h-4 w-4 mr-1" />
-                                  Driver
+                                  Email driver
                                 </Button>
                               )}
                               <Button
@@ -1091,6 +1314,40 @@ const BookingsPage = () => {
                         <SelectItem value="survey">Survey</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  {newManualOrder.status === 'survey' && (
+                    <div>
+                      <Label>Survey type</Label>
+                      <Select
+                        value={newManualOrder.surveyType}
+                        onValueChange={(value: 'home' | 'video') =>
+                          setNewManualOrder({ ...newManualOrder, surveyType: value })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="home">Home survey</SelectItem>
+                          <SelectItem value="video">Video survey</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  <div>
+                    <Label>Hours / duration</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      step="0.5"
+                      value={newManualOrder.hours || ''}
+                      onChange={(e) =>
+                        setNewManualOrder({
+                          ...newManualOrder,
+                          hours: parseFloat(e.target.value) || 0,
+                        })
+                      }
+                    />
                   </div>
                   <div>
                     <Label>Price (£)</Label>
@@ -1178,6 +1435,7 @@ const BookingsPage = () => {
                             <SelectItem value="bank-transfer">Bank Transfer</SelectItem>
                             <SelectItem value="cash">Cash</SelectItem>
                             <SelectItem value="card">Card</SelectItem>
+                            <SelectItem value="paypal">PayPal</SelectItem>
                             <SelectItem value="other">Other</SelectItem>
                           </SelectContent>
                         </Select>
@@ -1250,7 +1508,7 @@ const BookingsPage = () => {
                     <p className="text-xs text-muted-foreground mt-1">Equals number of vans</p>
                   </div>
                   <div>
-                    <Label>Helpers</Label>
+                    <Label>Additional helpers</Label>
                     <ClearableNumberInput
                       min={0}
                       max={20}
@@ -1347,6 +1605,28 @@ const BookingsPage = () => {
               </SectionShell>
 
               <SectionShell title="Pickup details" icon={<MapPin className="h-4 w-4 text-muted-foreground" />}>
+                {SHOW_HOUSE_NUMBER_NAME_FIELDS && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label>House number</Label>
+                    <Input
+                      value={newManualOrder.pickupHouseNumber}
+                      onChange={(e) =>
+                        setNewManualOrder({ ...newManualOrder, pickupHouseNumber: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>House name</Label>
+                    <Input
+                      value={newManualOrder.pickupHouseName}
+                      onChange={(e) =>
+                        setNewManualOrder({ ...newManualOrder, pickupHouseName: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+                )}
                 <div>
                   <Label>Pickup address</Label>
                   <Input
@@ -1563,6 +1843,34 @@ const BookingsPage = () => {
               </SectionShell>
 
               <SectionShell title="Drop-off details" icon={<MapPin className="h-4 w-4 text-muted-foreground" />}>
+                {SHOW_HOUSE_NUMBER_NAME_FIELDS && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <Label>House number</Label>
+                    <Input
+                      value={newManualOrder.deliveryHouseNumber}
+                      onChange={(e) =>
+                        setNewManualOrder({
+                          ...newManualOrder,
+                          deliveryHouseNumber: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>House name</Label>
+                    <Input
+                      value={newManualOrder.deliveryHouseName}
+                      onChange={(e) =>
+                        setNewManualOrder({
+                          ...newManualOrder,
+                          deliveryHouseName: e.target.value,
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+                )}
                 <div>
                   <Label>Delivery address</Label>
                   <Input
@@ -1646,6 +1954,22 @@ const BookingsPage = () => {
                   Send order confirmation email to customer
                 </Label>
               </div>
+              <div className="flex items-start gap-2 rounded-lg border bg-white p-3">
+                <Checkbox
+                  id="sendPaymentLink"
+                  className="mt-0.5"
+                  checked={newManualOrder.sendPaymentLink}
+                  onCheckedChange={(checked) =>
+                    setNewManualOrder({
+                      ...newManualOrder,
+                      sendPaymentLink: checked === true,
+                    })
+                  }
+                />
+                <Label htmlFor="sendPaymentLink" className="font-normal cursor-pointer leading-snug">
+                  Send payment link (pending payments only)
+                </Label>
+              </div>
               <DialogFooter className="sm:justify-between gap-2">
                 <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                   Cancel
@@ -1696,21 +2020,50 @@ const BookingsPage = () => {
                     />
                     <ReadField label="Email" value={viewingBooking.contactEmail} />
                     <ReadField label="Phone" value={viewingBooking.contactPhone} />
+                    <ReadField label="Booked on" value={formatDateTime(viewingBooking.createdAt)} />
                     <ReadField label="Service type" value={serviceLabel(viewingBooking.serviceType)} />
+                    {viewingBooking.status === 'survey' && (
+                      <ReadField
+                        label="Survey type"
+                        value={
+                          viewingBooking.surveyType === 'video'
+                            ? 'Video survey'
+                            : viewingBooking.surveyType === 'home'
+                              ? 'Home survey'
+                              : viewingBooking.surveyType
+                        }
+                      />
+                    )}
                     <ReadField
-                      label="Vans"
-                      value={formatVanCountsLabel(viewingBooking.vanCounts) !== '—'
-                        ? formatVanCountsLabel(viewingBooking.vanCounts)
-                        : vehicleLabel(viewingBooking.vehicleType)}
-                    />
-                    <ReadField
-                      label="People"
-                      value={formatPeopleSplit(
-                        viewingBooking.drivers,
-                        viewingBooking.helpers,
-                        viewingBooking.men
+                      label="Hours booked"
+                      value={formatDurationLabel(
+                        viewingBooking.durationRequired,
+                        viewingBooking.hours
                       )}
                     />
+                    <ReadField label="Vans" value={formatBookingVehicleLabel(viewingBooking)} />
+                    <ReadField label="People" value={formatBookingPeopleLabel(viewingBooking)} />
+                    <ReadField
+                      label="Drivers"
+                      value={
+                        viewingBooking.drivers != null ? String(viewingBooking.drivers) : undefined
+                      }
+                    />
+                    <ReadField
+                      label="Additional helpers"
+                      value={
+                        viewingBooking.helpers != null ? String(viewingBooking.helpers) : undefined
+                      }
+                    />
+                    {(viewingBooking.helpersRateTier != null ||
+                      isHelpersRateTier(viewingBooking.manRequired)) && (
+                      <ReadField
+                        label="Helpers rate tier"
+                        value={String(
+                          viewingBooking.helpersRateTier ?? viewingBooking.manRequired
+                        )}
+                      />
+                    )}
                     <ReadField
                       label="Extras"
                       value={formatServiceExtrasLabel(viewingBooking.serviceExtras)}
@@ -1722,12 +2075,46 @@ const BookingsPage = () => {
                           (viewingBooking.additionalWorkPayment || 0)
                       )}
                     />
+                    {viewingBooking.discountApplied && (
+                      <ReadField
+                        label="Discount"
+                        value={`${viewingBooking.discountCode || '—'}${
+                          viewingBooking.discountPercent
+                            ? ` (${viewingBooking.discountPercent}% off)`
+                            : ''
+                        }`}
+                      />
+                    )}
                     <ReadField label="Payment status" value={viewingBooking.paymentStatus} />
                     <ReadField
                       label="Payment method"
                       value={paymentMethodLabel(viewingBooking.paymentMethod)}
                     />
                     <ReadField label="Payment reference" value={viewingBooking.paymentReference} />
+                    {viewingBooking.externalOrderCode && (
+                      <ReadField
+                        label="External order code"
+                        value={viewingBooking.externalOrderCode}
+                      />
+                    )}
+                    {viewingBooking.paypalInvoiceUrl && (
+                      <div className="sm:col-span-2 space-y-1 min-w-0">
+                        <p className="text-xs text-muted-foreground">PayPal invoice</p>
+                        <a
+                          href={viewingBooking.paypalInvoiceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm font-medium text-primary break-all underline-offset-2 hover:underline"
+                        >
+                          {viewingBooking.paypalInvoiceUrl}
+                        </a>
+                        {viewingBooking.invoiceSentAt && (
+                          <p className="text-xs text-muted-foreground">
+                            Sent {formatDate(viewingBooking.invoiceSentAt)}
+                          </p>
+                        )}
+                      </div>
+                    )}
                     <ReadField
                       label="Driver"
                       value={
@@ -1760,7 +2147,22 @@ const BookingsPage = () => {
 
                 <SectionShell title="Pickup details" icon={<MapPin className="h-4 w-4 text-muted-foreground" />}>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <ReadField label="Address" value={viewingBooking.pickupAddress} />
+                    <ReadField label="House number" value={viewingBooking.pickupHouseNumber} />
+                    <ReadField label="House name" value={viewingBooking.pickupHouseName} />
+                    <ReadField
+                      label="Full address"
+                      value={formatFullAddress({
+                        houseName: viewingBooking.pickupHouseName,
+                        houseNumber: viewingBooking.pickupHouseNumber,
+                        address: viewingBooking.pickupStreet || viewingBooking.pickupAddress,
+                        city: viewingBooking.pickupCity,
+                        zipCode: viewingBooking.pickupZipCode,
+                      })}
+                    />
+                    <ReadField
+                      label="Street"
+                      value={viewingBooking.pickupStreet || viewingBooking.pickupAddress}
+                    />
                     <ReadField label="City" value={viewingBooking.pickupCity} />
                     <ReadField label="Postcode" value={viewingBooking.pickupZipCode} />
                     <ReadField label="Date" value={formatDate(viewingBooking.pickupDate)} />
@@ -1796,7 +2198,22 @@ const BookingsPage = () => {
 
                 <SectionShell title="Drop-off details" icon={<MapPin className="h-4 w-4 text-muted-foreground" />}>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <ReadField label="Address" value={viewingBooking.deliveryAddress} />
+                    <ReadField label="House number" value={viewingBooking.deliveryHouseNumber} />
+                    <ReadField label="House name" value={viewingBooking.deliveryHouseName} />
+                    <ReadField
+                      label="Full address"
+                      value={formatFullAddress({
+                        houseName: viewingBooking.deliveryHouseName,
+                        houseNumber: viewingBooking.deliveryHouseNumber,
+                        address: viewingBooking.deliveryStreet || viewingBooking.deliveryAddress,
+                        city: viewingBooking.deliveryCity,
+                        zipCode: viewingBooking.deliveryZipCode,
+                      })}
+                    />
+                    <ReadField
+                      label="Street"
+                      value={viewingBooking.deliveryStreet || viewingBooking.deliveryAddress}
+                    />
                     <ReadField label="City" value={viewingBooking.deliveryCity} />
                     <ReadField label="Postcode" value={viewingBooking.deliveryZipCode} />
                     <ReadField
@@ -1805,6 +2222,69 @@ const BookingsPage = () => {
                     />
                   </div>
                 </SectionShell>
+
+                {(viewingBooking.jobStartedAt ||
+                  viewingBooking.jobEndedAt ||
+                  viewingBooking.jobStartLat != null ||
+                  viewingBooking.jobEndLat != null) && (
+                  <SectionShell title="Job GPS / timing">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <ReadField
+                        label="Started at"
+                        value={formatDateTime(viewingBooking.jobStartedAt)}
+                      />
+                      <ReadField
+                        label="Start GPS"
+                        value={
+                          viewingBooking.jobStartLat != null && viewingBooking.jobStartLng != null
+                            ? `${viewingBooking.jobStartLat}, ${viewingBooking.jobStartLng}`
+                            : undefined
+                        }
+                      />
+                      <ReadField
+                        label="Ended at"
+                        value={formatDateTime(viewingBooking.jobEndedAt)}
+                      />
+                      <ReadField
+                        label="End GPS"
+                        value={
+                          viewingBooking.jobEndLat != null && viewingBooking.jobEndLng != null
+                            ? `${viewingBooking.jobEndLat}, ${viewingBooking.jobEndLng}`
+                            : undefined
+                        }
+                      />
+                    </div>
+                  </SectionShell>
+                )}
+
+                {viewingBooking.waiver?.signatureUrl && (
+                  <SectionShell title="Customer waiver">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <ReadField
+                        label="Signed by"
+                        value={viewingBooking.waiver.signedByName}
+                      />
+                      <ReadField
+                        label="Signed at"
+                        value={formatDateTime(viewingBooking.waiver.signedAt)}
+                      />
+                      {(viewingBooking.waiver.lat != null || viewingBooking.waiver.lng != null) && (
+                        <ReadField
+                          label="Waiver GPS"
+                          value={`${viewingBooking.waiver.lat ?? '—'}, ${viewingBooking.waiver.lng ?? '—'}`}
+                        />
+                      )}
+                    </div>
+                    <div className="mt-3">
+                      <p className="text-xs text-muted-foreground mb-2">Signature</p>
+                      <img
+                        src={viewingBooking.waiver.signatureUrl}
+                        alt="Customer signature"
+                        className="max-h-40 rounded-lg border bg-white object-contain p-2"
+                      />
+                    </div>
+                  </SectionShell>
+                )}
 
                 {((viewingBooking.pickupPhotos && viewingBooking.pickupPhotos.length > 0) ||
                   (viewingBooking.dropoffPhotos && viewingBooking.dropoffPhotos.length > 0) ||
@@ -1849,11 +2329,27 @@ const BookingsPage = () => {
                         </div>
                       )}
                     </div>
-                    {viewingBooking.driverNotes && (
-                      <p className="text-sm mt-3">
-                        <span className="text-muted-foreground">Driver notes: </span>
-                        {viewingBooking.driverNotes}
-                      </p>
+                  </SectionShell>
+                )}
+
+                {(viewingBooking.driverNotes ||
+                  (viewingBooking.driverNoteEntries &&
+                    viewingBooking.driverNoteEntries.length > 0)) && (
+                  <SectionShell title="Driver notes">
+                    {viewingBooking.driverNoteEntries &&
+                    viewingBooking.driverNoteEntries.length > 0 ? (
+                      <div className="space-y-2">
+                        {viewingBooking.driverNoteEntries.map((note: any, idx: number) => (
+                          <div key={idx} className="rounded-lg border bg-background p-3 text-sm">
+                            <p className="text-xs text-muted-foreground mb-1">
+                              {note.createdAt ? formatDateTime(note.createdAt) : 'Note'}
+                            </p>
+                            <p>{note.text}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm whitespace-pre-wrap">{viewingBooking.driverNotes}</p>
                     )}
                   </SectionShell>
                 )}
@@ -1876,6 +2372,14 @@ const BookingsPage = () => {
               </div>
             )}
             <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                variant="outline"
+                onClick={() => openCustomerSms(viewingBooking)}
+                disabled={!viewingBooking?.contactPhone}
+              >
+                <MessageCircle className="h-4 w-4 mr-1" />
+                Text customer
+              </Button>
               <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>
                 Close
               </Button>
@@ -1938,6 +2442,40 @@ const BookingsPage = () => {
                           <SelectItem value="disputed">Disputed</SelectItem>
                         </SelectContent>
                       </Select>
+                    </div>
+                    {editingBooking.status === 'survey' && (
+                      <div>
+                        <Label>Survey type</Label>
+                        <Select
+                          value={editingBooking.surveyType || 'home'}
+                          onValueChange={(value: 'home' | 'video') =>
+                            setEditingBooking({ ...editingBooking, surveyType: value })
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="home">Home survey</SelectItem>
+                            <SelectItem value="video">Video survey</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                    <div>
+                      <Label>Hours / duration</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        step="0.5"
+                        value={editingBooking.hours ?? ''}
+                        onChange={(e) =>
+                          setEditingBooking({
+                            ...editingBooking,
+                            hours: e.target.value === '' ? '' : parseFloat(e.target.value) || 0,
+                          })
+                        }
+                      />
                     </div>
                     <div>
                       <Label>Price (£)</Label>
@@ -2017,6 +2555,7 @@ const BookingsPage = () => {
                               <SelectItem value="bank-transfer">Bank Transfer</SelectItem>
                               <SelectItem value="cash">Cash</SelectItem>
                               <SelectItem value="card">Card</SelectItem>
+                              <SelectItem value="paypal">PayPal</SelectItem>
                               <SelectItem value="other">Other</SelectItem>
                             </SelectContent>
                           </Select>
@@ -2093,7 +2632,7 @@ const BookingsPage = () => {
                       />
                     </div>
                     <div>
-                      <Label>Helpers</Label>
+                      <Label>Additional helpers</Label>
                       <ClearableNumberInput
                         min={0}
                         max={20}

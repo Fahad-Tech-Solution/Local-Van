@@ -16,6 +16,8 @@ import AdminUsers from './pages/admin/Users'
 import AdminBookings from './pages/admin/Bookings'
 import AdminDrivers from './pages/admin/Drivers'
 import AdminDriverApplications from './pages/admin/DriverApplications'
+import AdminCalendar from './pages/admin/Calendar'
+import AdminWithdrawals from './pages/admin/Withdrawals'
 import DriverJobs from './pages/driver/Jobs'
 import DriverJobDetails from './pages/driver/JobDetails'
 import DriverVehicle from './pages/driver/Vehicle'
@@ -26,9 +28,12 @@ import DriverProfile from './pages/driver/Profile'
 import DriverPricingRules from './pages/driver/PricingRules'
 import DriverMessage from './pages/driver/Message'
 import DriverAvailableJobs from './pages/driver/AvailableJobs'
+import DriverCalendar from './pages/driver/Calendar'
+import DriverBalance from './pages/driver/Balance'
 import CustomerMessage from './pages/customer/Message'
 import Settings from './pages/Settings'
 import NotificationsPage from './pages/Notifications'
+import WaiverSign from './pages/WaiverSign'
 
 const queryClient = new QueryClient()
 
@@ -43,6 +48,7 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/driver-application" element={<DriverApplication />} />
           <Route path="/first-access" element={<FirstAccess />} />
+          <Route path="/waiver/:bookingId" element={<WaiverSign />} />
           
           {/* Admin Routes - Protected */}
           <Route path="/admin" element={
@@ -58,6 +64,16 @@ function App() {
           <Route path="/admin/bookings" element={
             <ProtectedRoute requiredRole="admin">
               <AdminBookings />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/calendar" element={
+            <ProtectedRoute requiredRole="admin">
+              <AdminCalendar />
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/withdrawals" element={
+            <ProtectedRoute requiredRole="admin">
+              <AdminWithdrawals />
             </ProtectedRoute>
           } />
           <Route path="/admin/drivers" element={
@@ -132,6 +148,16 @@ function App() {
           <Route path="/driver/available-jobs" element={
             <ProtectedRoute requiredRole="driver">
               <DriverAvailableJobs />
+            </ProtectedRoute>
+          } />
+          <Route path="/driver/calendar" element={
+            <ProtectedRoute requiredRole="driver">
+              <DriverCalendar />
+            </ProtectedRoute>
+          } />
+          <Route path="/driver/balance" element={
+            <ProtectedRoute requiredRole="driver">
+              <DriverBalance />
             </ProtectedRoute>
           } />
           <Route path="/driver/vehicle" element={
